@@ -26,7 +26,8 @@ import { RealtimeModule } from './realtime/realtime.module';
         username: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         autoLoadEntities: true,
-        synchronize: false,
+        synchronize:
+          process.env.TYPEORM_SYNC === 'true' || process.env.NODE_ENV === 'development',
         logging: process.env.NODE_ENV !== 'production',
         retryAttempts: 5,
         retryDelay: 2000,
