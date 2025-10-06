@@ -1,1 +1,0 @@
-{"version":3,"file":"current-user-id.decorator.js","sourceRoot":"","sources":["../../../src/auth/decorators/current-user-id.decorator.ts"],"names":[],"mappings":";;;AAAA,2CAAwE;AAE3D,QAAA,aAAa,GAAG,IAAA,6BAAoB,EAC/C,CAAC,KAAc,EAAE,GAAqB,EAAE,EAAE;IACxC,MAAM,OAAO,GAAG,GAAG,CAAC,YAAY,EAAE,CAAC,UAAU,EAAE,CAAC;IAChD,OAAO,OAAO,CAAC,IAAI,EAAE,MAAgB,CAAC;AACxC,CAAC,CACF,CAAC"}
