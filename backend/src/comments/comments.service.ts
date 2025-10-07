@@ -30,8 +30,10 @@ export class CommentsService {
 
     let parent: CommentEntity | null = null;
     if (dto.parentId) {
+      console.log(`Looking for parent comment with ID: ${dto.parentId}`);
       parent = await this.commentsRepository.findOne({ where: { id: dto.parentId }, relations: ['author'] });
       if (!parent) throw new NotFoundException('Parent comment not found');
+      console.log(`Parent comment found, author: ${parent.author.displayName}`);
     }
 
     const comment = this.commentsRepository.create({ content: dto.content, post, author, parent });
@@ -40,6 +42,7 @@ export class CommentsService {
 
     // If replying to a comment, notify the parent comment author
     if (parent && parent.author.id !== authorId) {
+      console.log(`Creating reply notification for ${parent.author.displayName}`);
       await this.notificationsService.create(
         parent.author.id,
         NotificationType.COMMENT,
@@ -50,6 +53,7 @@ export class CommentsService {
     }
     // Otherwise, notify the post author (unless commenting on own post)
     else if (!parent && post.author.id !== authorId) {
+      console.log(`Creating post comment notification for ${post.author.displayName}`);
       await this.notificationsService.create(
         post.author.id,
         NotificationType.COMMENT,
