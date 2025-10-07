@@ -40,6 +40,10 @@ export class LikesService {
 
     // Create notification for post author (if not liking own post)
     if (post.author.id !== user.id) {
+      // First, delete any existing like notifications for this post from this user
+      // This ensures no duplicates if somehow they exist
+      await this.notificationsService.deleteLikeNotification(post.author.id, user.id, postId);
+      
       // Get user details for notification
       const fullUser = await this.usersRepository.findOne({ where: { id: user.id } });
       if (fullUser) {
@@ -57,10 +61,22 @@ export class LikesService {
   }
 
   async unlike(user: User, postId: string) {
-    const existing = await this.likesRepository.findOne({ where: { user: { id: user.id }, post: { id: postId } } });
+    const existing = await this.likesRepository.findOne({ 
+      where: { user: { id: user.id }, post: { id: postId } },
+      relations: ['post', 'post.author']
+    });
     if (!existing) return { success: true };
+    
+    const postAuthorId = existing.post.author.id;
+    
     await this.likesRepository.remove(existing);
     this.realtime.emitLikeRemoved(postId, user.id);
+    
+    // Delete the like notification if it exists
+    if (postAuthorId !== user.id) {
+      await this.notificationsService.deleteLikeNotification(postAuthorId, user.id, postId);
+    }
+    
     return { success: true };
   }
 

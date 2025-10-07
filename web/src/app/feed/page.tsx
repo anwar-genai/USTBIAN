@@ -36,6 +36,7 @@ export default function FeedPage() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -51,6 +52,7 @@ export default function FeedPage() {
       const socket = getSocket();
       socket.off('post.like.added');
       socket.off('post.like.removed');
+      socket.removeAllListeners(); // Remove all listeners to prevent duplicates
     };
   }, [router]);
 
@@ -77,8 +79,11 @@ export default function FeedPage() {
     }
   };
 
-  const setupRealtimeListeners = () => {
+  const setupRealtimeListeners = async () => {
     const socket = getSocket();
+    
+    // Remove any existing listeners first to prevent duplicates
+    socket.removeAllListeners();
 
     socket.on('post.like.added', (data: { postId: string; userId: string }) => {
       console.log('Like added:', data);
@@ -91,11 +96,37 @@ export default function FeedPage() {
 
     const token = getToken();
     if (token) {
-      api.getMe(token).then((me) => {
+      try {
+        const me = await api.getMe(token);
+        
+        // Listen for new notifications (prevent duplicates by checking if already exists)
         socket.on(`notification.${me.userId}`, (notification: Notification) => {
-          setNotifications((prev) => [notification, ...prev]);
+          console.log('New notification received:', notification);
+          setNotifications((prev) => {
+            // Check if notification already exists to prevent duplicates
+            if (prev.some((n) => n.id === notification.id)) {
+              return prev;
+            }
+            return [notification, ...prev];
+          });
         });
-      });
+
+        // Listen for deleted notifications
+        socket.on(`notification.deleted.${me.userId}`, (data: any) => {
+          console.log('Notification deletion event received:', data);
+          const notifId = data?.notificationId || data?.id;
+          if (notifId) {
+            console.log('Deleting notification with ID:', notifId);
+            setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+          } else {
+            console.error('No notificationId found in deletion event:', data);
+          }
+        });
+        
+        setCurrentUserId(me.userId);
+      } catch (err) {
+        console.error('Failed to setup realtime listeners', err);
+      }
     }
   };
 
@@ -158,6 +189,34 @@ export default function FeedPage() {
     }
   };
 
+  const handleMarkAllAsRead = async () => {
+    const token = getToken();
+    if (!token) return;
+
+    setMarkingAllRead(true);
+    try {
+      await api.markAllNotificationsAsRead(token);
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch (err) {
+      console.error('Failed to mark all as read', err);
+    } finally {
+      setMarkingAllRead(false);
+    }
+  };
+
+  // Close notifications dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (showNotifications && !target.closest('.notifications-dropdown') && !target.closest('.notifications-bell')) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNotifications]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -175,10 +234,25 @@ export default function FeedPage() {
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Ustbian</h1>
           <div className="flex items-center gap-4">
+            {/* Profile Link */}
+            <a
+              href="/profile"
+              className="p-2 text-gray-600 hover:text-gray-900 transition"
+              title="Profile"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+            </a>
             {/* Notifications Bell */}
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2 text-gray-600 hover:text-gray-900 transition"
+              className="relative p-2 text-gray-600 hover:text-gray-900 transition notifications-bell"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -205,9 +279,18 @@ export default function FeedPage() {
 
         {/* Notifications Dropdown */}
         {showNotifications && (
-          <div className="absolute right-4 top-16 w-80 bg-white rounded-lg shadow-lg border border-gray-200 max-h-96 overflow-y-auto">
-            <div className="p-4 border-b border-gray-200">
+          <div className="absolute right-16 top-14 w-80 bg-white rounded-lg shadow-lg border border-gray-200 max-h-96 overflow-y-auto notifications-dropdown">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">Notifications</h3>
+              {unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllAsRead}
+                  disabled={markingAllRead}
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                >
+                  {markingAllRead ? 'Marking...' : 'Mark all read'}
+                </button>
+              )}
             </div>
             {notifications.length === 0 ? (
               <div className="p-4 text-center text-gray-500">No notifications</div>

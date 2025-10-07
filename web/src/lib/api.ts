@@ -122,5 +122,35 @@ export const api = {
     if (!res.ok) throw new Error('Failed to mark notification as read');
     return res.json();
   },
+
+  async getUserById(token: string, userId: string) {
+    const res = await fetch(`${API_URL}/users/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch user');
+    return res.json();
+  },
+
+  async updateUser(token: string, userId: string, data: { displayName?: string; bio?: string; avatarUrl?: string }) {
+    const res = await fetch(`${API_URL}/users/${userId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update user');
+    return res.json();
+  },
+
+  async markAllNotificationsAsRead(token: string) {
+    const res = await fetch(`${API_URL}/notifications/read-all`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to mark all notifications as read');
+    return res.json();
+  },
 };
 

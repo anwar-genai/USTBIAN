@@ -6,12 +6,22 @@ Backend API for the Ustbian university social app. Stack: NestJS v11, TypeORM (P
 - **Auth**: register, login (JWT), `GET /auth/me`
 - **Users**: create, get by id, update profile
 - **Posts**: list, create, get by id, update, delete (with author authorization)
-- **Likes**: like/unlike posts with realtime Socket.IO events
+- **Likes**: 
+  - Like/unlike posts with realtime Socket.IO events
+  - Track liked posts per user (`GET /likes/my`)
+  - Prevent duplicate likes
+  - Auto-delete notifications when post is unliked
 - **Follows**: follow/unfollow users, get followers/following lists
-- **Notifications**: create, list, mark as read (individual or all), realtime delivery
+- **Notifications**: 
+  - Auto-create on like events (shows user display name)
+  - List, mark as read (individual or all)
+  - Realtime delivery via Socket.IO
+  - Auto-cleanup when like is removed
+  - Prevent duplicate notifications
 - **Realtime**: Socket.IO gateway for:
   - `post.like.added` / `post.like.removed`
-  - `notification.{userId}` for user-specific notifications
+  - `notification.{userId}` - new notifications
+  - `notification.deleted.{userId}` - notification removals
 - **Health**: `GET /health`
 - **Swagger docs**: available at `/docs` with full API documentation
 
@@ -75,11 +85,12 @@ POST /auth/login
 - Use the Authorize button to paste your Bearer JWT.
 - Try endpoints directly from the browser.
 
-### WebSocket (realtime) testing
+### WebSocket (realtime) events
 - Connect a Socket.IO client to `ws://localhost:3000` and listen for:
-  - `post.like.added` { postId, userId }
-  - `post.like.removed` { postId, userId }
-  - `notification.{userId}` for user-specific notification events
+  - `post.like.added` - { postId, userId }
+  - `post.like.removed` - { postId, userId }
+  - `notification.{userId}` - new notification object for specific user
+  - `notification.deleted.{userId}` - { notificationId } when notification is removed
 
 ### Notes
 - TypeORM is configured with `synchronize: false`. For local bootstrapping, either:

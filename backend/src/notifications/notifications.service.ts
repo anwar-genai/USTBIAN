@@ -57,5 +57,37 @@ export class NotificationsService {
     await this.notificationsRepository.update({ recipient: { id: userId }, read: false }, { read: true });
     return { success: true };
   }
+
+  async deleteLikeNotification(recipientId: string, actorId: string, postId: string) {
+    // Find ALL like notifications from this actor to this recipient (no matter how many)
+    const notifications = await this.notificationsRepository.find({
+      where: {
+        recipient: { id: recipientId },
+        actor: { id: actorId },
+        type: NotificationType.LIKE,
+      },
+    });
+
+    // Filter by postId in metadata and delete ALL matches
+    const toDelete = notifications.filter((n) => n.metadata?.postId === postId);
+    
+    if (toDelete.length > 0) {
+      console.log(`Deleting ${toDelete.length} notification(s) for post ${postId}`);
+      
+      // Capture IDs before deletion
+      const idsToDelete = toDelete.map((n) => n.id);
+      
+      // Delete from database
+      await this.notificationsRepository.remove(toDelete);
+      
+      // Emit realtime deletion event for each deleted notification
+      idsToDelete.forEach((id) => {
+        console.log(`Emitting deletion for notification ID: ${id}`);
+        this.realtime.emitNotificationDeleted(recipientId, id);
+      });
+    }
+
+    return { success: true, deleted: toDelete.length };
+  }
 }
 
