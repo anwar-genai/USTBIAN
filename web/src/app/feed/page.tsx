@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getToken, clearToken } from '@/lib/auth';
@@ -40,6 +40,9 @@ export default function FeedPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const notifMenuRef = useRef<HTMLDivElement | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const profileTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const token = getToken();
@@ -229,6 +232,30 @@ export default function FeedPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showNotifications, showProfileMenu]);
 
+  // Keyboard: close on Escape and focus management
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showNotifications) setShowNotifications(false);
+        if (showProfileMenu) {
+          setShowProfileMenu(false);
+          // return focus to trigger
+          profileTriggerRef.current?.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showNotifications, showProfileMenu]);
+
+  // Move focus into dropdowns when they open (basic a11y)
+  useEffect(() => {
+    if (showNotifications) notifMenuRef.current?.focus();
+  }, [showNotifications]);
+  useEffect(() => {
+    if (showProfileMenu) profileMenuRef.current?.focus();
+  }, [showProfileMenu]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -246,125 +273,149 @@ export default function FeedPage() {
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Ustbian</h1>
           <div className="flex items-center gap-4">
-            {/* Notifications Bell */}
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2 text-gray-600 hover:text-gray-900 transition notifications-bell"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                />
-              </svg>
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
+            {/* Notifications (anchored) */}
+            <div className="relative">
+              <button
+                aria-haspopup="menu"
+                aria-expanded={showNotifications}
+                onClick={() => {
+                  setShowNotifications((v) => !v);
+                  setShowProfileMenu(false);
+                }}
+                className="relative p-2 text-gray-600 hover:text-gray-900 transition notifications-bell focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                  />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
 
-            {/* Profile Menu */}
-            <button
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className="profile-menu-trigger"
-            >
-              {currentUser?.avatarUrl ? (
-                <img
-                  src={currentUser.avatarUrl}
-                  alt={currentUser.displayName}
-                  className="w-9 h-9 rounded-full object-cover border-2 border-gray-300 hover:border-blue-500 transition"
-                />
-              ) : (
-                <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold hover:bg-blue-700 transition">
-                  {currentUser?.displayName?.[0]?.toUpperCase() || 'U'}
+              {showNotifications && (
+                <div
+                  ref={notifMenuRef}
+                  role="menu"
+                  tabIndex={-1}
+                  className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-y-auto notifications-dropdown focus:outline-none"
+                >
+                  <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900">Notifications</h3>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={handleMarkAllAsRead}
+                        disabled={markingAllRead}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                      >
+                        {markingAllRead ? 'Marking...' : 'Mark all read'}
+                      </button>
+                    )}
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">No notifications</div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {notifications.map((notif) => (
+                        <button
+                          key={notif.id}
+                          role="menuitem"
+                          onClick={() => handleNotificationClick(notif.id)}
+                          className={`w-full text-left p-3 hover:bg-gray-50 cursor-pointer transition ${!notif.read ? 'bg-blue-50' : ''}`}
+                        >
+                          <p className="text-sm text-gray-800">{notif.message || notif.type}</p>
+                          <p className="text-xs text-gray-500 mt-1">{new Date(notif.createdAt).toLocaleString()}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </button>
+            </div>
+
+            {/* Profile (anchored) */}
+            <div className="relative">
+              <button
+                ref={profileTriggerRef}
+                aria-haspopup="menu"
+                aria-expanded={showProfileMenu}
+                onClick={() => {
+                  setShowProfileMenu((v) => !v);
+                  setShowNotifications(false);
+                }}
+                className="profile-menu-trigger focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full"
+              >
+                {currentUser?.avatarUrl ? (
+                  <img
+                    src={currentUser.avatarUrl}
+                    alt={currentUser.displayName}
+                    className="w-9 h-9 rounded-full object-cover border border-gray-300 hover:border-blue-500 transition"
+                  />
+                ) : (
+                  <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold hover:bg-blue-700 transition">
+                    {currentUser?.displayName?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                )}
+              </button>
+
+              {showProfileMenu && (
+                <div
+                  ref={profileMenuRef}
+                  role="menu"
+                  tabIndex={-1}
+                  className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 profile-dropdown focus:outline-none"
+                >
+                  <div className="p-3 border-b border-gray-200 flex items-center gap-3">
+                    {currentUser?.avatarUrl ? (
+                      <img src={currentUser.avatarUrl} alt="avatar" className="w-6 h-6 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                        {currentUser?.displayName?.[0]?.toUpperCase() || 'U'}
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-semibold text-gray-900 leading-4">{currentUser?.displayName}</p>
+                      <p className="text-xs text-gray-600">@{currentUser?.username}</p>
+                    </div>
+                  </div>
+                  <div className="py-1">
+                    <a
+                      href="/profile"
+                      role="menuitem"
+                      className="block px-3 py-2 text-gray-700 hover:bg-gray-50 transition"
+                    >
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        View Profile
+                      </div>
+                    </a>
+                    <button
+                      role="menuitem"
+                      onClick={handleLogout}
+                      className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 transition"
+                    >
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Logout
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Notifications Dropdown */}
-        {showNotifications && (
-          <div className="absolute right-16 top-14 w-80 bg-white rounded-lg shadow-lg border border-gray-200 max-h-96 overflow-y-auto notifications-dropdown">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Notifications</h3>
-              {unreadCount > 0 && (
-                <button
-                  onClick={handleMarkAllAsRead}
-                  disabled={markingAllRead}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
-                >
-                  {markingAllRead ? 'Marking...' : 'Mark all read'}
-                </button>
-              )}
-            </div>
-            {notifications.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">No notifications</div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {notifications.map((notif) => (
-                  <div
-                    key={notif.id}
-                    onClick={() => handleNotificationClick(notif.id)}
-                    className={`p-4 hover:bg-gray-50 cursor-pointer transition ${!notif.read ? 'bg-blue-50' : ''}`}
-                  >
-                    <p className="text-sm text-gray-800">{notif.message || notif.type}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {new Date(notif.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Profile Menu Dropdown */}
-        {showProfileMenu && (
-          <div className="absolute right-4 top-14 w-56 bg-white rounded-lg shadow-lg border border-gray-200 profile-dropdown">
-            <div className="p-4 border-b border-gray-200">
-              <p className="font-semibold text-gray-900">{currentUser?.displayName}</p>
-              <p className="text-sm text-gray-600">@{currentUser?.username}</p>
-            </div>
-            <div className="py-2">
-              <a
-                href="/profile"
-                className="block px-4 py-2 text-gray-700 hover:bg-gray-50 transition"
-              >
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                  View Profile
-                </div>
-              </a>
-              <button
-                onClick={handleLogout}
-                className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 transition"
-              >
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                    />
-                  </svg>
-                  Logout
-                </div>
-              </button>
-            </div>
-          </div>
-        )}
+      
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-6">
