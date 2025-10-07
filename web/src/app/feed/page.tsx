@@ -101,6 +101,30 @@ export default function FeedPage() {
     }
   };
 
+  const formatTimeAgo = (iso: string) => {
+    try {
+      const date = new Date(iso);
+      const now = new Date();
+      const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+      if (seconds < 60) return 'just now';
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      if (days < 7) return `${days}d ago`;
+      const weeks = Math.floor(days / 7);
+      if (weeks < 4) return `${weeks}w ago`;
+      const months = Math.floor(days / 30);
+      if (months < 12) return `${months}mo ago`;
+      const years = Math.floor(days / 365);
+      return `${years}y ago`;
+    } catch {
+      return iso;
+    }
+  };
+
   const dedupeById = (items: any[]) => {
     const seen = new Set<string>();
     const out: any[] = [];
@@ -700,9 +724,10 @@ export default function FeedPage() {
                   )}
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span className="font-semibold text-gray-900">{post.author.displayName}</span>
                         <span className="text-gray-500 text-sm">@{post.author.username}</span>
+                        <span className="text-gray-400 text-xs">· {formatTimeAgo(post.createdAt)}</span>
                       </div>
                       {post.author.id === currentUserId && (
                         <div className="flex items-center gap-2">
@@ -788,7 +813,6 @@ export default function FeedPage() {
                         </svg>
                         <RollingCounter value={post.commentsCount ?? 0} />
                       </button>
-                      <span className="text-sm text-gray-500">{formatDate(post.createdAt)}</span>
                     </div>
                     {expandedPostId === post.id && (
                       <div className="mt-4 border-t border-gray-200 pt-4 space-y-3">
