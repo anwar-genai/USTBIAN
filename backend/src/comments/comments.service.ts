@@ -5,6 +5,7 @@ import { CommentEntity } from './comment.entity';
 import { PostEntity } from '../posts/post.entity';
 import { User } from '../users/user.entity';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Injectable()
 export class CommentsService {
@@ -15,6 +16,7 @@ export class CommentsService {
     private readonly postsRepository: Repository<PostEntity>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    private readonly realtime: RealtimeGateway,
   ) {}
 
   async addComment(postId: string, authorId: string, dto: CreateCommentDto): Promise<CommentEntity> {
@@ -30,7 +32,9 @@ export class CommentsService {
     }
 
     const comment = this.commentsRepository.create({ content: dto.content, post, author, parent });
-    return await this.commentsRepository.save(comment);
+    const saved = await this.commentsRepository.save(comment);
+    this.realtime.emitCommentAdded(postId, { ...saved, post: undefined });
+    return saved;
   }
 
   async deleteComment(authorId: string, commentId: string): Promise<void> {
@@ -38,10 +42,16 @@ export class CommentsService {
     if (!c) return;
     if (c.author.id !== authorId) throw new UnauthorizedException('Cannot delete others comments');
     await this.commentsRepository.remove(c);
+    this.realtime.emitCommentDeleted(c.post.id, commentId);
   }
 
-  async listForPost(postId: string): Promise<CommentEntity[]> {
-    return await this.commentsRepository.find({ where: { post: { id: postId } }, order: { createdAt: 'ASC' } });
+  async listForPost(postId: string, limit = 50, offset = 0): Promise<CommentEntity[]> {
+    return await this.commentsRepository.find({
+      where: { post: { id: postId } },
+      order: { createdAt: 'ASC' },
+      take: limit,
+      skip: offset,
+    });
   }
 
   async countForPost(postId: string): Promise<number> {

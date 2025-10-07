@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { CommentsService } from '../comments/comments.service';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
@@ -9,7 +10,10 @@ import { CurrentUserId } from '../auth/decorators/current-user-id.decorator';
 @ApiTags('Posts')
 @Controller('posts')
 export class PostsController {
-  constructor(private readonly postsService: PostsService) {}
+  constructor(
+    private readonly postsService: PostsService,
+    private readonly commentsService: CommentsService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List recent posts' })
@@ -26,9 +30,11 @@ export class PostsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get post by ID' })
-  findById(@Param('id') id: string) {
-    return this.postsService.findById(id);
+  @ApiOperation({ summary: 'Get post by ID (includes commentsCount)' })
+  async findById(@Param('id') id: string) {
+    const post = await this.postsService.findById(id);
+    const commentsCount = await this.commentsService.countForPost(id);
+    return { ...post, commentsCount } as any;
   }
 
   @UseGuards(JwtAuthGuard)

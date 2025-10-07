@@ -11,9 +11,13 @@ export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List comments for a post' })
-  list(@Param('postId') postId: string) {
-    return this.commentsService.listForPost(postId);
+  @ApiOperation({ summary: 'List comments for a post (supports ?limit=&offset=)' })
+  list(@Param('postId') postId: string, @Param() _p: any) {
+    // Nest parses query via @Query; keep minimal typing
+    const url = new URL('http://local' + (global as any).request?.url ?? '');
+    const limit = Number(url.searchParams.get('limit') ?? 50);
+    const offset = Number(url.searchParams.get('offset') ?? 0);
+    return this.commentsService.listForPost(postId, limit, offset);
   }
 
   @UseGuards(JwtAuthGuard)

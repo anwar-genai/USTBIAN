@@ -25,6 +25,15 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     console.log(`Emitting notification deletion: recipientId=${recipientId}, notificationId=${notificationId}`);
     this.server.emit(`notification.deleted.${recipientId}`, { notificationId });
   }
+
+  // Comments realtime
+  emitCommentAdded(postId: string, comment: any) {
+    this.server.emit(`comment.added.${postId}`, comment);
+  }
+
+  emitCommentDeleted(postId: string, commentId: string) {
+    this.server.emit(`comment.deleted.${postId}`, { commentId });
+  }
 }
 
 
