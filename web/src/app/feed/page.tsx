@@ -91,6 +91,7 @@ export default function FeedPage() {
   const [deletePostConfirm, setDeletePostConfirm] = useState<string | null>(null);
   const [editingPost, setEditingPost] = useState<string | null>(null);
   const [editPostContent, setEditPostContent] = useState<string>('');
+  const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
 
   const formatDate = (iso: string) => {
     try {
@@ -245,20 +246,56 @@ export default function FeedPage() {
     }
   };
 
+  const cleanPostContent = (content: string): string => {
+    // Remove excessive consecutive newlines (replace 3+ with 2)
+    let cleaned = content.replace(/\n{3,}/g, '\n\n');
+    
+    // Remove trailing/leading whitespace from each line
+    cleaned = cleaned.split('\n').map(line => line.trim()).join('\n');
+    
+    // Remove leading/trailing empty lines
+    cleaned = cleaned.trim();
+    
+    return cleaned;
+  };
+
+  const validatePost = (content: string): string | null => {
+    if (!content.trim()) return 'Post cannot be empty';
+    return null;
+  };
+
+  const shouldTruncatePost = (content: string): boolean => {
+    const lines = content.split('\n');
+    return lines.length > 3;
+  };
+
+  const getTruncatedPost = (content: string): string => {
+    const lines = content.split('\n');
+    return lines.slice(0, 3).join('\n');
+  };
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPost.trim()) return;
+    
+    const cleanedContent = cleanPostContent(newPost);
+    
+    const error = validatePost(cleanedContent);
+    if (error) {
+      alert(error);
+      return;
+    }
 
     const token = getToken();
     if (!token) return;
 
     setPosting(true);
     try {
-      await api.createPost(token, newPost);
+      await api.createPost(token, cleanedContent);
       setNewPost('');
       await loadData();
     } catch (err) {
       console.error('Failed to create post', err);
+      alert('Failed to create post. Please try again.');
     } finally {
       setPosting(false);
     }
@@ -295,17 +332,26 @@ export default function FeedPage() {
 
   const handleSavePost = async (postId: string) => {
     const token = getToken();
-    if (!token || !editPostContent.trim()) return;
+    if (!token) return;
+
+    const cleanedContent = cleanPostContent(editPostContent);
+
+    const error = validatePost(cleanedContent);
+    if (error) {
+      alert(error);
+      return;
+    }
 
     try {
-      await api.updatePost(token, postId, editPostContent);
+      await api.updatePost(token, postId, cleanedContent);
       setPosts((prev) =>
-        prev.map((p) => (p.id === postId ? { ...p, content: editPostContent } : p))
+        prev.map((p) => (p.id === postId ? { ...p, content: cleanedContent } : p))
       );
       setEditingPost(null);
       setEditPostContent('');
     } catch (err) {
       console.error('Failed to update post', err);
+      alert('Failed to update post. Please try again.');
     }
   };
 
@@ -787,7 +833,31 @@ export default function FeedPage() {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-gray-800 mt-2 whitespace-pre-wrap">{post.content}</p>
+                      <div className="mt-2">
+                        <p className="text-gray-800 whitespace-pre-wrap">
+                          {expandedPosts.has(post.id) || !shouldTruncatePost(post.content)
+                            ? post.content
+                            : getTruncatedPost(post.content)}
+                        </p>
+                        {shouldTruncatePost(post.content) && (
+                          <button
+                            onClick={() =>
+                              setExpandedPosts((prev) => {
+                                const newSet = new Set(prev);
+                                if (newSet.has(post.id)) {
+                                  newSet.delete(post.id);
+                                } else {
+                                  newSet.add(post.id);
+                                }
+                                return newSet;
+                              })
+                            }
+                            className="text-blue-600 hover:text-blue-700 text-sm font-medium mt-1 cursor-pointer"
+                          >
+                            {expandedPosts.has(post.id) ? 'Show less' : 'Show more'}
+                          </button>
+                        )}
+                      </div>
                     )}
                     <div className="mt-4 flex items-center gap-4">
                       {/* Like Button */}

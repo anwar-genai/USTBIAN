@@ -244,6 +244,24 @@ export default function PostDetailPage() {
     }
   };
 
+  const cleanPostContent = (content: string): string => {
+    // Remove excessive consecutive newlines (replace 3+ with 2)
+    let cleaned = content.replace(/\n{3,}/g, '\n\n');
+    
+    // Remove trailing/leading whitespace from each line
+    cleaned = cleaned.split('\n').map(line => line.trim()).join('\n');
+    
+    // Remove leading/trailing empty lines
+    cleaned = cleaned.trim();
+    
+    return cleaned;
+  };
+
+  const validatePost = (content: string): string | null => {
+    if (!content.trim()) return 'Post cannot be empty';
+    return null;
+  };
+
   const handleEditPost = () => {
     setEditingPost(true);
     setEditPostContent(post.content);
@@ -251,15 +269,24 @@ export default function PostDetailPage() {
 
   const handleSavePost = async () => {
     const token = getToken();
-    if (!token || !editPostContent.trim()) return;
+    if (!token) return;
+
+    const cleanedContent = cleanPostContent(editPostContent);
+
+    const error = validatePost(cleanedContent);
+    if (error) {
+      alert(error);
+      return;
+    }
 
     try {
-      await api.updatePost(token, postId, editPostContent);
-      setPost((prev: any) => (prev ? { ...prev, content: editPostContent } : prev));
+      await api.updatePost(token, postId, cleanedContent);
+      setPost((prev: any) => (prev ? { ...prev, content: cleanedContent } : prev));
       setEditingPost(false);
       setEditPostContent('');
     } catch (err) {
       console.error('Failed to update post', err);
+      alert('Failed to update post. Please try again.');
     }
   };
 

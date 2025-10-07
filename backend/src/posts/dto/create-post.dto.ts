@@ -1,8 +1,11 @@
-import { IsArray, IsOptional, IsString, Length, MaxLength } from 'class-validator';
+import { IsArray, IsOptional, IsString, Length, MaxLength, Matches } from 'class-validator';
 
 export class CreatePostDto {
   @IsString()
   @Length(1, 500)
+  @Matches(/^(?!.*\n{3,}).*$/s, {
+    message: 'Post cannot contain more than 2 consecutive line breaks',
+  })
   content: string;
 
   @IsOptional()
