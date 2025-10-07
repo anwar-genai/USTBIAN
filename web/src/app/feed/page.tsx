@@ -123,16 +123,24 @@ export default function FeedPage() {
     // Remove any existing listeners first to prevent duplicates
     socket.removeAllListeners();
 
-    socket.on('post.like.added', (data: { postId: string; userId: string }) => {
-      console.log('Like added:', data);
-      // Refresh posts to show updated like count if needed
-    });
-
-    socket.on('post.like.removed', (data: { postId: string; userId: string }) => {
-      console.log('Like removed:', data);
-    });
-
     const token = getToken();
+    if (token) {
+      try {
+        const me = await api.getMe(token);
+        const myUserId = me.userId as string;
+
+        socket.on('post.like.added', (data: { postId: string; userId: string }) => {
+          if (data.userId === myUserId) return;
+          setPosts((prev) => prev.map((p) => (p.id === data.postId ? { ...p, likesCount: (p.likesCount || 0) + 1 } : p)));
+        });
+
+        socket.on('post.like.removed', (data: { postId: string; userId: string }) => {
+          if (data.userId === myUserId) return;
+          setPosts((prev) => prev.map((p) => (p.id === data.postId ? { ...p, likesCount: Math.max((p.likesCount || 1) - 1, 0) } : p)));
+        });
+      } catch {}
+    }
+
     if (token) {
       try {
         const me = await api.getMe(token);
