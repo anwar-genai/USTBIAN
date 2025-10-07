@@ -17,6 +17,7 @@ interface Post {
     avatarUrl?: string;
   };
   createdAt: string;
+  commentsCount?: number;
 }
 
 interface Notification {
@@ -40,6 +41,9 @@ export default function FeedPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Record<string, any[]>>({});
+  const [newComment, setNewComment] = useState<Record<string, string>>({});
   const notifMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const profileTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -180,6 +184,48 @@ export default function FeedPage() {
     }
   };
 
+  const loadComments = async (postId: string) => {
+    try {
+      const data = await api.getComments(postId, 50, 0);
+      setComments((prev) => ({ ...prev, [postId]: data }));
+    } catch (e) {
+      console.error('Failed to load comments', e);
+    }
+  };
+
+  const handleToggleComments = async (postId: string) => {
+    const next = expandedPostId === postId ? null : postId;
+    setExpandedPostId(next);
+    if (next && !comments[next]) {
+      await loadComments(next);
+    }
+  };
+
+  const handleAddComment = async (postId: string) => {
+    const token = getToken();
+    if (!token) return;
+    const text = (newComment[postId] || '').trim();
+    if (!text) return;
+    try {
+      const created = await api.addComment(token, postId, text);
+      setComments((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), created] }));
+      setNewComment((prev) => ({ ...prev, [postId]: '' }));
+    } catch (e) {
+      console.error('Failed to add comment', e);
+    }
+  };
+
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      await api.deleteComment(token, postId, commentId);
+      setComments((prev) => ({ ...prev, [postId]: (prev[postId] || []).filter((c) => c.id !== commentId) }));
+    } catch (e) {
+      console.error('Failed to delete comment', e);
+    }
+  };
+
   const handleLogout = () => {
     clearToken();
     router.push('/login');
@@ -255,6 +301,23 @@ export default function FeedPage() {
   useEffect(() => {
     if (showProfileMenu) profileMenuRef.current?.focus();
   }, [showProfileMenu]);
+  // Realtime comments listeners
+  useEffect(() => {
+    if (!expandedPostId) return;
+    const socket = getSocket();
+    const added = (comment: any) => {
+      setComments((prev) => ({ ...prev, [expandedPostId]: [ ...(prev[expandedPostId] || []), comment ] }));
+    };
+    const deleted = (data: { commentId: string }) => {
+      setComments((prev) => ({ ...prev, [expandedPostId]: (prev[expandedPostId] || []).filter((c) => c.id !== data.commentId) }));
+    };
+    socket.on(`comment.added.${expandedPostId}`, added);
+    socket.on(`comment.deleted.${expandedPostId}`, deleted);
+    return () => {
+      socket.off(`comment.added.${expandedPostId}`, added);
+      socket.off(`comment.deleted.${expandedPostId}`, deleted);
+    };
+  }, [expandedPostId]);
 
   if (loading) {
     return (
@@ -492,10 +555,58 @@ export default function FeedPage() {
                           {likedPosts.has(post.id) ? 'Liked' : 'Like'}
                         </span>
                       </button>
-                      <span className="text-sm text-gray-500">
-                        {new Date(post.createdAt).toLocaleString()}
-                      </span>
+                      <button
+                        onClick={() => handleToggleComments(post.id)}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition cursor-pointer"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8M8 14h5m5 0V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11l4-3h8a2 2 0 002-2z" />
+                        </svg>
+                        <span className="text-sm font-medium">Comments{post.commentsCount !== undefined ? ` (${post.commentsCount})` : ''}</span>
+                      </button>
+                      <span className="text-sm text-gray-500">{new Date(post.createdAt).toLocaleString()}</span>
                     </div>
+                    {expandedPostId === post.id && (
+                      <div className="mt-4 border-t border-gray-200 pt-4 space-y-3">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newComment[post.id] || ''}
+                            onChange={(e) => setNewComment((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                            placeholder="Write a comment..."
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                          <button
+                            onClick={() => handleAddComment(post.id)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer"
+                          >
+                            Send
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {(comments[post.id] || []).map((c) => (
+                            <div key={c.id} className="flex items-start gap-2">
+                              <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-700 font-semibold">
+                                {c.author?.displayName?.[0]?.toUpperCase() || 'U'}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-gray-900">{c.author?.displayName || 'User'}</span>
+                                  <span className="text-xs text-gray-500">{new Date(c.createdAt).toLocaleString()}</span>
+                                </div>
+                                <p className="text-gray-800 text-sm mt-1 whitespace-pre-wrap">{c.content}</p>
+                              </div>
+                              <button
+                                onClick={() => handleDeleteComment(post.id, c.id)}
+                                className="text-xs text-red-600 hover:text-red-700"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
