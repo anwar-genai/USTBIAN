@@ -13,6 +13,7 @@ import { RealtimeModule } from './realtime/realtime.module';
 import { FollowsModule } from './follows/follows.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { CommentsModule } from './comments/comments.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { UploadsModule } from './uploads/uploads.module';
     FollowsModule,
     NotificationsModule,
     UploadsModule,
+    CommentsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
