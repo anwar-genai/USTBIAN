@@ -1,6 +1,73 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+// Rolling counter animation (old value slides up, new value slides in)
+function RollingCounter({ value }: { value: number }) {
+  const prevRef = useRef<number>(value);
+  const [displayValue, setDisplayValue] = useState(value);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    const prev = prevRef.current;
+    if (value === prev) return;
+
+    setIsAnimating(true);
+    // Wait a frame so the animation can start
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setDisplayValue(value);
+      });
+    });
+
+    const t = setTimeout(() => {
+      prevRef.current = value;
+      setIsAnimating(false);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [value]);
+
+  const prev = prevRef.current;
+  const direction = value > prev ? 'up' : 'down';
+  const widthCh = String(Math.max(prev, value)).length + 0.5;
+
+  if (!isAnimating) {
+    return (
+      <span
+        className="inline-block align-middle"
+        style={{ width: `${widthCh}ch` }}
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {value}
+      </span>
+    );
+  }
+
+  const prevClass = direction === 'up' 
+    ? (displayValue !== prev ? '-translate-y-full opacity-0' : 'translate-y-0')
+    : (displayValue !== prev ? 'translate-y-full opacity-0' : 'translate-y-0');
+    
+  const currClass = direction === 'up'
+    ? (displayValue === value ? 'translate-y-0' : 'translate-y-full')
+    : (displayValue === value ? 'translate-y-0' : '-translate-y-full');
+
+  return (
+    <span
+      className="relative inline-block h-5 overflow-hidden align-middle"
+      style={{ width: `${widthCh}ch` }}
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <span className={`absolute left-0 top-0 transition-all duration-300 ease-out ${prevClass}`}>
+        {prev}
+      </span>
+      <span className={`absolute left-0 top-0 transition-all duration-300 ease-out ${currClass}`}>
+        {value}
+      </span>
+    </span>
+  );
+}
+
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getToken, clearToken } from '@/lib/auth';
@@ -642,7 +709,7 @@ export default function FeedPage() {
                             d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
                           />
                         </svg>
-                        <span className="text-sm font-medium">{post.likesCount ?? 0}</span>
+                        <RollingCounter value={post.likesCount ?? 0} />
                       </button>
                       <button
                         aria-label={`Comments: ${post.commentsCount ?? 0}`}
@@ -652,7 +719,7 @@ export default function FeedPage() {
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8M8 14h5m5 0V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11l4-3h8a2 2 0 002-2z" />
                         </svg>
-                        <span className="text-sm font-medium">{post.commentsCount ?? 0}</span>
+                        <RollingCounter value={post.commentsCount ?? 0} />
                       </button>
                       <span className="text-sm text-gray-500">{formatDate(post.createdAt)}</span>
                     </div>
