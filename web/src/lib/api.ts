@@ -165,5 +165,34 @@ export const api = {
     if (!res.ok) throw new Error('Failed to upload avatar');
     return res.json();
   },
+
+  // Comments
+  async getComments(postId: string, limit = 50, offset = 0) {
+    const res = await fetch(`${API_URL}/posts/${postId}/comments?limit=${limit}&offset=${offset}`);
+    if (!res.ok) throw new Error('Failed to fetch comments');
+    return res.json();
+  },
+
+  async addComment(token: string, postId: string, content: string, parentId?: string) {
+    const res = await fetch(`${API_URL}/posts/${postId}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ content, parentId }),
+    });
+    if (!res.ok) throw new Error('Failed to add comment');
+    return res.json();
+  },
+
+  async deleteComment(token: string, postId: string, commentId: string) {
+    const res = await fetch(`${API_URL}/posts/${postId}/comments/${commentId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to delete comment');
+    return res.json();
+  },
 };
 
