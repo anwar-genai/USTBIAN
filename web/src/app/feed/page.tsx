@@ -588,13 +588,14 @@ export default function FeedPage() {
                         </span>
                       </button>
                       <button
+                        aria-label={`Comments: ${post.commentsCount ?? 0}`}
                         onClick={() => handleToggleComments(post.id)}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition cursor-pointer"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition cursor-pointer"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8M8 14h5m5 0V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11l4-3h8a2 2 0 002-2z" />
                         </svg>
-                        <span className="text-sm font-medium">Comments ({post.commentsCount ?? 0})</span>
+                        <span className="text-sm font-medium">{post.commentsCount ?? 0}</span>
                       </button>
                       <span className="text-sm text-gray-500">{formatDate(post.createdAt)}</span>
                     </div>
