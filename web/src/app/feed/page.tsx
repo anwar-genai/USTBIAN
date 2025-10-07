@@ -282,7 +282,7 @@ export default function FeedPage() {
                   setShowNotifications((v) => !v);
                   setShowProfileMenu(false);
                 }}
-                className="relative p-2 text-gray-600 hover:text-gray-900 transition notifications-bell focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full"
+                className="relative p-2 text-gray-600 hover:text-gray-900 transition notifications-bell focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -349,7 +349,7 @@ export default function FeedPage() {
                   setShowProfileMenu((v) => !v);
                   setShowNotifications(false);
                 }}
-                className="profile-menu-trigger focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full"
+                className="profile-menu-trigger focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
               >
                 {currentUser?.avatarUrl ? (
                   <img
