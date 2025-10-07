@@ -47,6 +47,7 @@ export default function FeedPage() {
   const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [replyTo, setReplyTo] = useState<Record<string, any | null>>({});
   const [commentOffset, setCommentOffset] = useState<Record<string, number>>({});
+  const deletedCommentIdsRef = useRef<Set<string>>(new Set());
 
   const formatDate = (iso: string) => {
     try {
@@ -261,6 +262,8 @@ export default function FeedPage() {
     if (!token) return;
     try {
       if (!confirm('Delete this comment?')) return;
+      // mark to ignore realtime duplicate decrement
+      deletedCommentIdsRef.current.add(commentId);
       await api.deleteComment(token, postId, commentId);
       setComments((prev) => ({ ...prev, [postId]: (prev[postId] || []).filter((c) => c.id !== commentId) }));
       // optimistic decrement
@@ -349,11 +352,30 @@ export default function FeedPage() {
   useEffect(() => {
     if (!expandedPostId) return;
     const socket = getSocket();
+    let myUserIdCache: string | null = null;
+    (async () => {
+      const token = getToken();
+      if (!token) return;
+      try {
+        const me = await api.getMe(token);
+        myUserIdCache = me.userId as string;
+      } catch {}
+    })();
+
     const added = (comment: any) => {
+      // Skip if I just added optimistically
+      if (comment?.author?.id && myUserIdCache && comment.author.id === myUserIdCache) return;
       setComments((prev) => ({ ...prev, [expandedPostId]: dedupeById([ ...(prev[expandedPostId] || []), comment ]) }));
+      // increment count for the post that received comment
+      setPosts((prev) => prev.map((p) => (p.id === expandedPostId ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p)));
     };
     const deleted = (data: { commentId: string }) => {
+      if (deletedCommentIdsRef.current.has(data.commentId)) {
+        deletedCommentIdsRef.current.delete(data.commentId);
+        return;
+      }
       setComments((prev) => ({ ...prev, [expandedPostId]: (prev[expandedPostId] || []).filter((c) => c.id !== data.commentId) }));
+      setPosts((prev) => prev.map((p) => (p.id === expandedPostId ? { ...p, commentsCount: Math.max((p.commentsCount || 1) - 1, 0) } : p)));
     };
     socket.on(`comment.added.${expandedPostId}`, added);
     socket.on(`comment.deleted.${expandedPostId}`, deleted);
@@ -362,6 +384,31 @@ export default function FeedPage() {
       socket.off(`comment.deleted.${expandedPostId}`, deleted);
     };
   }, [expandedPostId]);
+
+  // Global per-post listeners to keep counts in sync even when threads are collapsed or in other tabs
+  useEffect(() => {
+    const socket = getSocket();
+    const handlers: { id: string; add: (c: any) => void; del: (d: { commentId: string }) => void }[] = [];
+    posts.forEach((p) => {
+      const add = (comment: any) => {
+        if (comment?.author?.id && currentUserId && comment.author.id === currentUserId) return;
+        setPosts((prev) => prev.map((x) => (x.id === p.id ? { ...x, commentsCount: (x.commentsCount || 0) + 1 } : x)));
+      };
+      const del = (data: { commentId: string }) => {
+        if (deletedCommentIdsRef.current.has(data.commentId)) return;
+        setPosts((prev) => prev.map((x) => (x.id === p.id ? { ...x, commentsCount: Math.max((x.commentsCount || 1) - 1, 0) } : x)));
+      };
+      socket.on(`comment.added.${p.id}`, add);
+      socket.on(`comment.deleted.${p.id}`, del);
+      handlers.push({ id: p.id, add, del });
+    });
+    return () => {
+      handlers.forEach((h) => {
+        socket.off(`comment.added.${h.id}`, h.add);
+        socket.off(`comment.deleted.${h.id}`, h.del);
+      });
+    };
+  }, [posts, currentUserId]);
 
   if (loading) {
     return (
