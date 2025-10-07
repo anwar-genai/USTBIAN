@@ -111,6 +111,7 @@ export default function FeedPage() {
   const notifMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const profileTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const commentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
     const token = getToken();
@@ -718,24 +719,30 @@ export default function FeedPage() {
                         {/* Comment input */}
                         <div className="flex gap-2">
                           <input
+                            ref={(el) => (commentInputRefs.current[post.id] = el)}
                             type="text"
                             value={newComment[post.id] || ''}
                             onChange={(e) => setNewComment((prev) => ({ ...prev, [post.id]: e.target.value }))}
                             placeholder={replyTo[post.id] ? `Reply to ${replyTo[post.id].author?.displayName}...` : "Write a comment..."}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
+                              if (e.key === 'Enter') {
                                 e.preventDefault();
-                                handleAddComment(post.id);
+                                if (newComment[post.id]?.trim()) {
+                                  handleAddComment(post.id);
+                                }
                               }
                             }}
                           />
                           <button
                             onClick={() => handleAddComment(post.id)}
                             disabled={!newComment[post.id]?.trim()}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="p-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={replyTo[post.id] ? 'Send reply' : 'Send comment'}
                           >
-                            {replyTo[post.id] ? 'Reply' : 'Send'}
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                            </svg>
                           </button>
                         </div>
 
@@ -754,16 +761,30 @@ export default function FeedPage() {
                                 <p className="text-gray-800 text-sm mt-1 whitespace-pre-wrap break-words">{c.content}</p>
                                 <div className="mt-1 flex items-center gap-3">
                                   <button
-                                    onClick={() => setReplyTo((prev) => ({ ...prev, [post.id]: c }))}
-                                    className="text-xs text-blue-600 hover:underline cursor-pointer"
+                                    onClick={() => {
+                                      setReplyTo((prev) => ({ ...prev, [post.id]: c }));
+                                      // Focus input after state update
+                                      setTimeout(() => {
+                                        commentInputRefs.current[post.id]?.focus();
+                                      }, 0);
+                                    }}
+                                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 cursor-pointer transition"
+                                    title="Reply to this comment"
                                   >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                    </svg>
                                     Reply
                                   </button>
                                   {c.author?.id === currentUserId && (
                                     <button
                                       onClick={() => handleDeleteComment(post.id, c.id)}
-                                      className="text-xs text-red-600 hover:text-red-700 cursor-pointer"
+                                      className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 cursor-pointer transition"
+                                      title="Delete this comment"
                                     >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
                                       Delete
                                     </button>
                                   )}
