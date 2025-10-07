@@ -72,7 +72,7 @@ export class NotificationsService {
     const toDelete = notifications.filter((n) => n.metadata?.postId === postId);
     
     if (toDelete.length > 0) {
-      console.log(`Deleting ${toDelete.length} notification(s) for post ${postId}`);
+      console.log(`Deleting ${toDelete.length} like notification(s) for post ${postId}`);
       
       // Capture IDs before deletion
       const idsToDelete = toDelete.map((n) => n.id);
@@ -83,6 +83,34 @@ export class NotificationsService {
       // Emit realtime deletion event for each deleted notification
       idsToDelete.forEach((id) => {
         console.log(`Emitting deletion for notification ID: ${id}`);
+        this.realtime.emitNotificationDeleted(recipientId, id);
+      });
+    }
+
+    return { success: true, deleted: toDelete.length };
+  }
+
+  async deleteCommentNotification(recipientId: string, actorId: string, postId: string, commentId: string) {
+    const notifications = await this.notificationsRepository.find({
+      where: {
+        recipient: { id: recipientId },
+        actor: { id: actorId },
+        type: NotificationType.COMMENT,
+      },
+    });
+
+    const toDelete = notifications.filter(
+      (n) => n.metadata?.postId === postId && n.metadata?.commentId === commentId,
+    );
+
+    if (toDelete.length > 0) {
+      console.log(`Deleting ${toDelete.length} comment notification(s) for comment ${commentId}`);
+
+      const idsToDelete = toDelete.map((n) => n.id);
+      await this.notificationsRepository.remove(toDelete);
+
+      idsToDelete.forEach((id) => {
+        console.log(`Emitting deletion for comment notification ID: ${id}`);
         this.realtime.emitNotificationDeleted(recipientId, id);
       });
     }
