@@ -24,6 +24,8 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -52,6 +54,12 @@ export default function ProfilePage() {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
     const token = getToken();
@@ -59,17 +67,31 @@ export default function ProfilePage() {
 
     setSaving(true);
     try {
+      let finalAvatarUrl = avatarUrl;
+
+      // Upload avatar if file is selected
+      if (selectedFile) {
+        setUploading(true);
+        const uploadResult = await api.uploadAvatar(token, selectedFile);
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+        finalAvatarUrl = `${API_URL}${uploadResult.url}`;
+        setUploading(false);
+      }
+
       await api.updateUser(token, user.id, {
         displayName,
         bio,
-        avatarUrl: avatarUrl || undefined,
+        avatarUrl: finalAvatarUrl || undefined,
       });
+      
+      setSelectedFile(null);
       await loadProfile();
       setEditing(false);
     } catch (err) {
       console.error('Failed to update profile', err);
     } finally {
       setSaving(false);
+      setUploading(false);
     }
   };
 
@@ -109,9 +131,17 @@ export default function ProfilePage() {
         <div className="bg-white rounded-lg shadow p-8">
           {/* Avatar */}
           <div className="flex flex-col items-center mb-6">
-            <div className="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-semibold mb-4">
-              {user.displayName[0].toUpperCase()}
-            </div>
+            {user.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.displayName}
+                className="w-24 h-24 rounded-full object-cover mb-4 border-2 border-gray-200"
+              />
+            ) : (
+              <div className="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-semibold mb-4">
+                {user.displayName[0].toUpperCase()}
+              </div>
+            )}
             {!editing && (
               <>
                 <h1 className="text-2xl font-bold text-gray-900">{user.displayName}</h1>
@@ -153,24 +183,29 @@ export default function ProfilePage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Avatar URL (optional)
+                  Profile Image
                 </label>
                 <input
-                  type="url"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  onChange={handleFileChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="https://example.com/avatar.jpg"
                 />
+                {selectedFile && (
+                  <p className="text-xs text-green-600 mt-1">
+                    Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">Max 5MB. Supported: JPG, PNG, GIF, WebP</p>
               </div>
 
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={handleSave}
-                  disabled={saving}
+                  disabled={saving || uploading}
                   className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium transition"
                 >
-                  {saving ? 'Saving...' : 'Save Changes'}
+                  {uploading ? 'Uploading...' : saving ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button
                   onClick={() => {

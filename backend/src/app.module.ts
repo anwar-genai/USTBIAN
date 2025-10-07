@@ -12,6 +12,7 @@ import { LikesModule } from './likes/likes.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { FollowsModule } from './follows/follows.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     LikesModule,
     FollowsModule,
     NotificationsModule,
+    UploadsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

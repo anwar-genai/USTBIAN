@@ -152,5 +152,18 @@ export const api = {
     if (!res.ok) throw new Error('Failed to mark all notifications as read');
     return res.json();
   },
+
+  async uploadAvatar(token: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${API_URL}/uploads/avatar`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) throw new Error('Failed to upload avatar');
+    return res.json();
+  },
 };
 

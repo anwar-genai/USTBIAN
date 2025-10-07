@@ -14,6 +14,7 @@ interface Post {
     id: string;
     username: string;
     displayName: string;
+    avatarUrl?: string;
   };
   createdAt: string;
 }
@@ -349,9 +350,17 @@ export default function FeedPage() {
             posts.map((post) => (
               <div key={post.id} className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-                    {post.author.displayName[0].toUpperCase()}
-                  </div>
+                  {post.author.avatarUrl ? (
+                    <img
+                      src={post.author.avatarUrl}
+                      alt={post.author.displayName}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
+                      {post.author.displayName[0].toUpperCase()}
+                    </div>
+                  )}
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-gray-900">{post.author.displayName}</span>
