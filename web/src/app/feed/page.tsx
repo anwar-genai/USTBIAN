@@ -474,7 +474,7 @@ export default function FeedPage() {
                       {/* Like Button */}
                       <button
                         onClick={() => handleLike(post.id)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition ${
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition cursor-pointer ${
                           likedPosts.has(post.id)
                             ? 'bg-red-50 text-red-600'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
