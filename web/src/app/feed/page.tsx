@@ -37,7 +37,9 @@ export default function FeedPage() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -69,8 +71,12 @@ export default function FeedPage() {
         api.getMyLikes(token).catch(() => ({ likedPostIds: [] })),
       ]);
 
+      // Fetch full user profile
+      const userData = await api.getUserById(token, meData.userId);
+
       setPosts(postsData);
       setCurrentUserId(meData.userId);
+      setCurrentUser(userData);
       setNotifications(notificationsData);
       setLikedPosts(new Set(likesData.likedPostIds));
     } catch (err) {
@@ -205,18 +211,23 @@ export default function FeedPage() {
     }
   };
 
-  // Close notifications dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
+      
       if (showNotifications && !target.closest('.notifications-dropdown') && !target.closest('.notifications-bell')) {
         setShowNotifications(false);
+      }
+      
+      if (showProfileMenu && !target.closest('.profile-dropdown') && !target.closest('.profile-menu-trigger')) {
+        setShowProfileMenu(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showNotifications]);
+  }, [showNotifications, showProfileMenu]);
 
   if (loading) {
     return (
@@ -235,21 +246,6 @@ export default function FeedPage() {
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Ustbian</h1>
           <div className="flex items-center gap-4">
-            {/* Profile Link */}
-            <a
-              href="/profile"
-              className="p-2 text-gray-600 hover:text-gray-900 transition"
-              title="Profile"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-            </a>
             {/* Notifications Bell */}
             <button
               onClick={() => setShowNotifications(!showNotifications)}
@@ -269,11 +265,23 @@ export default function FeedPage() {
                 </span>
               )}
             </button>
+
+            {/* Profile Menu */}
             <button
-              onClick={handleLogout}
-              className="text-sm text-gray-600 hover:text-gray-900 font-medium"
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="profile-menu-trigger"
             >
-              Logout
+              {currentUser?.avatarUrl ? (
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.displayName}
+                  className="w-9 h-9 rounded-full object-cover border-2 border-gray-300 hover:border-blue-500 transition"
+                />
+              ) : (
+                <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold hover:bg-blue-700 transition">
+                  {currentUser?.displayName?.[0]?.toUpperCase() || 'U'}
+                </div>
+              )}
             </button>
           </div>
         </div>
@@ -311,6 +319,50 @@ export default function FeedPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Profile Menu Dropdown */}
+        {showProfileMenu && (
+          <div className="absolute right-4 top-14 w-56 bg-white rounded-lg shadow-lg border border-gray-200 profile-dropdown">
+            <div className="p-4 border-b border-gray-200">
+              <p className="font-semibold text-gray-900">{currentUser?.displayName}</p>
+              <p className="text-sm text-gray-600">@{currentUser?.username}</p>
+            </div>
+            <div className="py-2">
+              <a
+                href="/profile"
+                className="block px-4 py-2 text-gray-700 hover:bg-gray-50 transition"
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                    />
+                  </svg>
+                  View Profile
+                </div>
+              </a>
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 transition"
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                    />
+                  </svg>
+                  Logout
+                </div>
+              </button>
+            </div>
           </div>
         )}
       </header>
