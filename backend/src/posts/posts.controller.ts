@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CommentsService } from '../comments/comments.service';
+import { LikesService } from '../likes/likes.service';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
@@ -13,6 +14,7 @@ export class PostsController {
   constructor(
     private readonly postsService: PostsService,
     private readonly commentsService: CommentsService,
+    private readonly likesService: LikesService,
   ) {}
 
   @Get()
@@ -20,7 +22,11 @@ export class PostsController {
   async list() {
     const posts = await this.postsService.listRecent();
     const withCounts = await Promise.all(
-      posts.map(async (p) => ({ ...p, commentsCount: await this.commentsService.countForPost(p.id) })),
+      posts.map(async (p) => ({
+        ...p,
+        commentsCount: await this.commentsService.countForPost(p.id),
+        likesCount: await this.likesService.countForPost(p.id),
+      })),
     );
     return withCounts as any;
   }
@@ -38,7 +44,8 @@ export class PostsController {
   async findById(@Param('id') id: string) {
     const post = await this.postsService.findById(id);
     const commentsCount = await this.commentsService.countForPost(id);
-    return { ...post, commentsCount } as any;
+    const likesCount = await this.likesService.countForPost(id);
+    return { ...post, commentsCount, likesCount } as any;
   }
 
   @UseGuards(JwtAuthGuard)

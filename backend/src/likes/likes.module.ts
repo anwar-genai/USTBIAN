@@ -20,6 +20,7 @@ import { User } from '../users/user.entity';
   ],
   providers: [LikesService],
   controllers: [LikesController, MyLikesController],
+  exports: [LikesService],
 })
 export class LikesModule {}
 

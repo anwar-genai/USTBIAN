@@ -103,6 +103,10 @@ export class LikesService {
     });
     return likes.map((like) => like.post.id);
   }
+
+  async countForPost(postId: string): Promise<number> {
+    return this.likesRepository.count({ where: { post: { id: postId } } });
+  }
 }
 
 

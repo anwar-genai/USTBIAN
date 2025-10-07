@@ -18,6 +18,7 @@ interface Post {
   };
   createdAt: string;
   commentsCount?: number;
+  likesCount?: number;
 }
 
 interface Notification {
@@ -198,9 +199,12 @@ export default function FeedPage() {
           newSet.delete(postId);
           return newSet;
         });
+        // optimistic
+        setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likesCount: Math.max((p.likesCount || 1) - 1, 0) } : p)));
       } else {
         await api.likePost(token, postId);
         setLikedPosts((prev) => new Set(prev).add(postId));
+        setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, likesCount: (p.likesCount || 0) + 1 } : p)));
       }
     } catch (err) {
       console.error('Failed to toggle like', err);
@@ -569,7 +573,7 @@ export default function FeedPage() {
                       {/* Like Button */}
                       <button
                         onClick={() => handleLike(post.id)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition cursor-pointer ${
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full transition cursor-pointer ${
                           likedPosts.has(post.id)
                             ? 'bg-red-50 text-red-600'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -583,9 +587,7 @@ export default function FeedPage() {
                             d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
                           />
                         </svg>
-                        <span className="text-sm font-medium">
-                          {likedPosts.has(post.id) ? 'Liked' : 'Like'}
-                        </span>
+                        <span className="text-sm font-medium">{post.likesCount ?? 0}</span>
                       </button>
                       <button
                         aria-label={`Comments: ${post.commentsCount ?? 0}`}
