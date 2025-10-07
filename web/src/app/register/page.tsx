@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { setToken } from '@/lib/auth';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -22,15 +21,14 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const data = await api.register({
+      await api.register({
         email,
         username,
         displayName,
         password,
         bio: bio || undefined,
       });
-      setToken(data.access_token);
-      router.push('/feed');
+      router.push('/login');
     } catch (err) {
       setError('Registration failed. Username or email may already exist.');
     } finally {
