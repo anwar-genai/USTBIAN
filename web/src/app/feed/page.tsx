@@ -382,15 +382,21 @@ export default function FeedPage() {
     router.push('/login');
   };
 
-  const handleNotificationClick = async (notificationId: string) => {
+  const handleNotificationClick = async (notification: any) => {
     const token = getToken();
     if (!token) return;
 
     try {
-      await api.markNotificationAsRead(token, notificationId);
+      // Mark as read
+      await api.markNotificationAsRead(token, notification.id);
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+        prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
       );
+
+      // Navigate to post if metadata contains postId
+      if (notification.metadata?.postId) {
+        router.push(`/post/${notification.metadata.postId}`);
+      }
     } catch (err) {
       console.error('Failed to mark notification as read', err);
     }
@@ -584,7 +590,7 @@ export default function FeedPage() {
                         <button
                           key={notif.id}
                           role="menuitem"
-                          onClick={() => handleNotificationClick(notif.id)}
+                          onClick={() => handleNotificationClick(notif)}
                           className={`w-full text-left p-3 hover:bg-gray-50 cursor-pointer transition ${!notif.read ? 'bg-blue-50' : ''}`}
                         >
                           <p className="text-sm text-gray-800">{notif.message || notif.type}</p>
