@@ -16,9 +16,13 @@ export class PostsController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'List recent posts' })
-  list() {
-    return this.postsService.listRecent();
+  @ApiOperation({ summary: 'List recent posts (includes commentsCount)' })
+  async list() {
+    const posts = await this.postsService.listRecent();
+    const withCounts = await Promise.all(
+      posts.map(async (p) => ({ ...p, commentsCount: await this.commentsService.countForPost(p.id) })),
+    );
+    return withCounts as any;
   }
 
   @UseGuards(JwtAuthGuard)

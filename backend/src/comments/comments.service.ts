@@ -49,6 +49,7 @@ export class CommentsService {
     return await this.commentsRepository.find({
       where: { post: { id: postId } },
       order: { createdAt: 'ASC' },
+      relations: ['parent'],
       take: limit,
       skip: offset,
     });

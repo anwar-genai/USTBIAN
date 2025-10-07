@@ -44,6 +44,29 @@ export default function FeedPage() {
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, any[]>>({});
   const [newComment, setNewComment] = useState<Record<string, string>>({});
+  const [replyTo, setReplyTo] = useState<Record<string, any | null>>({});
+  const [commentOffset, setCommentOffset] = useState<Record<string, number>>({});
+
+  const formatDate = (iso: string) => {
+    try {
+      // Stable, timezone-agnostic rendering to avoid hydration mismatches
+      return new Date(iso).toISOString().slice(0, 16).replace('T', ' ');
+    } catch {
+      return iso;
+    }
+  };
+
+  const dedupeById = (items: any[]) => {
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const it of items) {
+      const id = it?.id;
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(it);
+    }
+    return out;
+  };
   const notifMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const profileTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -186,8 +209,10 @@ export default function FeedPage() {
 
   const loadComments = async (postId: string) => {
     try {
-      const data = await api.getComments(postId, 50, 0);
-      setComments((prev) => ({ ...prev, [postId]: data }));
+      const offset = commentOffset[postId] ?? 0;
+      const data = await api.getComments(postId, 20, offset);
+      setComments((prev) => ({ ...prev, [postId]: dedupeById([ ...(prev[postId] || []), ...data ]) }));
+      setCommentOffset((prev) => ({ ...prev, [postId]: offset + data.length }));
     } catch (e) {
       console.error('Failed to load comments', e);
     }
@@ -207,9 +232,13 @@ export default function FeedPage() {
     const text = (newComment[postId] || '').trim();
     if (!text) return;
     try {
-      const created = await api.addComment(token, postId, text);
-      setComments((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), created] }));
+      const parentId = replyTo[postId]?.id as string | undefined;
+      const created = await api.addComment(token, postId, text, parentId);
+      setComments((prev) => ({ ...prev, [postId]: dedupeById([...(prev[postId] || []), created]) }));
       setNewComment((prev) => ({ ...prev, [postId]: '' }));
+      setReplyTo((prev) => ({ ...prev, [postId]: null }));
+      // optimistic increment
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p)));
     } catch (e) {
       console.error('Failed to add comment', e);
     }
@@ -219,8 +248,11 @@ export default function FeedPage() {
     const token = getToken();
     if (!token) return;
     try {
+      if (!confirm('Delete this comment?')) return;
       await api.deleteComment(token, postId, commentId);
       setComments((prev) => ({ ...prev, [postId]: (prev[postId] || []).filter((c) => c.id !== commentId) }));
+      // optimistic decrement
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, commentsCount: Math.max((p.commentsCount || 1) - 1, 0) } : p)));
     } catch (e) {
       console.error('Failed to delete comment', e);
     }
@@ -306,7 +338,7 @@ export default function FeedPage() {
     if (!expandedPostId) return;
     const socket = getSocket();
     const added = (comment: any) => {
-      setComments((prev) => ({ ...prev, [expandedPostId]: [ ...(prev[expandedPostId] || []), comment ] }));
+      setComments((prev) => ({ ...prev, [expandedPostId]: dedupeById([ ...(prev[expandedPostId] || []), comment ]) }));
     };
     const deleted = (data: { commentId: string }) => {
       setComments((prev) => ({ ...prev, [expandedPostId]: (prev[expandedPostId] || []).filter((c) => c.id !== data.commentId) }));
@@ -562,9 +594,9 @@ export default function FeedPage() {
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8M8 14h5m5 0V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11l4-3h8a2 2 0 002-2z" />
                         </svg>
-                        <span className="text-sm font-medium">Comments{post.commentsCount !== undefined ? ` (${post.commentsCount})` : ''}</span>
+                        <span className="text-sm font-medium">Comments ({post.commentsCount ?? 0})</span>
                       </button>
-                      <span className="text-sm text-gray-500">{new Date(post.createdAt).toLocaleString()}</span>
+                      <span className="text-sm text-gray-500">{formatDate(post.createdAt)}</span>
                     </div>
                     {expandedPostId === post.id && (
                       <div className="mt-4 border-t border-gray-200 pt-4 space-y-3">
@@ -585,26 +617,55 @@ export default function FeedPage() {
                         </div>
                         <div className="space-y-2">
                           {(comments[post.id] || []).map((c) => (
-                            <div key={c.id} className="flex items-start gap-2">
+                            <div key={c.id} className={`flex items-start gap-2 ${c.parent ? 'pl-8 border-l border-gray-100' : ''}`}>
                               <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-700 font-semibold">
                                 {c.author?.displayName?.[0]?.toUpperCase() || 'U'}
                               </div>
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm font-semibold text-gray-900">{c.author?.displayName || 'User'}</span>
-                                  <span className="text-xs text-gray-500">{new Date(c.createdAt).toLocaleString()}</span>
+                                  <span className="text-xs text-gray-500">{formatDate(c.createdAt)}</span>
                                 </div>
                                 <p className="text-gray-800 text-sm mt-1 whitespace-pre-wrap">{c.content}</p>
+                                <div className="mt-1 flex items-center gap-3">
+                                  <button
+                                    onClick={() => setReplyTo((prev) => ({ ...prev, [post.id]: c }))}
+                                    className="text-xs text-blue-600 hover:underline"
+                                  >
+                                    Reply
+                                  </button>
+                              {c.author?.id === currentUserId && (
+                                <button
+                                  onClick={() => handleDeleteComment(post.id, c.id)}
+                                  className="text-xs text-red-600 hover:text-red-700"
+                                >
+                                  Delete
+                                </button>
+                              )}
+                                </div>
                               </div>
-                              <button
-                                onClick={() => handleDeleteComment(post.id, c.id)}
-                                className="text-xs text-red-600 hover:text-red-700"
-                              >
-                                Delete
-                              </button>
                             </div>
                           ))}
                         </div>
+                        <div className="pt-2">
+                          <button
+                            onClick={() => loadComments(post.id)}
+                            className="text-sm text-gray-600 hover:text-gray-900"
+                          >
+                            Load more
+                          </button>
+                        </div>
+                        {replyTo[post.id] && (
+                          <div className="text-xs text-gray-500">
+                            Replying to: <span className="font-medium">{replyTo[post.id].author?.displayName || 'User'}</span>
+                            <button
+                              onClick={() => setReplyTo((prev) => ({ ...prev, [post.id]: null }))}
+                              className="ml-2 text-blue-600 hover:underline"
+                            >
+                              cancel
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

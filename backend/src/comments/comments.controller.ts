@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, UseGuards, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CommentsService } from './comments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -12,12 +12,14 @@ export class CommentsController {
 
   @Get()
   @ApiOperation({ summary: 'List comments for a post (supports ?limit=&offset=)' })
-  list(@Param('postId') postId: string, @Param() _p: any) {
-    // Nest parses query via @Query; keep minimal typing
-    const url = new URL('http://local' + (global as any).request?.url ?? '');
-    const limit = Number(url.searchParams.get('limit') ?? 50);
-    const offset = Number(url.searchParams.get('offset') ?? 0);
-    return this.commentsService.listForPost(postId, limit, offset);
+  list(
+    @Param('postId') postId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const l = Number(limit ?? 50);
+    const o = Number(offset ?? 0);
+    return this.commentsService.listForPost(postId, l, o);
   }
 
   @UseGuards(JwtAuthGuard)
