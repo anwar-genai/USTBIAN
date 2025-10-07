@@ -88,6 +88,9 @@ export default function FeedPage() {
   const [commentOffset, setCommentOffset] = useState<Record<string, number>>({});
   const deletedCommentIdsRef = useRef<Set<string>>(new Set());
   const [deleteConfirm, setDeleteConfirm] = useState<{ postId: string; commentId: string } | null>(null);
+  const [deletePostConfirm, setDeletePostConfirm] = useState<string | null>(null);
+  const [editingPost, setEditingPost] = useState<string | null>(null);
+  const [editPostContent, setEditPostContent] = useState<string>('');
 
   const formatDate = (iso: string) => {
     try {
@@ -258,6 +261,41 @@ export default function FeedPage() {
       }
     } catch (err) {
       console.error('Failed to toggle like', err);
+    }
+  };
+
+  const handleEditPost = (post: any) => {
+    setEditingPost(post.id);
+    setEditPostContent(post.content);
+  };
+
+  const handleSavePost = async (postId: string) => {
+    const token = getToken();
+    if (!token || !editPostContent.trim()) return;
+
+    try {
+      await api.updatePost(token, postId, editPostContent);
+      setPosts((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, content: editPostContent } : p))
+      );
+      setEditingPost(null);
+      setEditPostContent('');
+    } catch (err) {
+      console.error('Failed to update post', err);
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      await api.deletePost(token, postId);
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      setDeletePostConfirm(null);
+    } catch (err) {
+      console.error('Failed to delete post', err);
+      setDeletePostConfirm(null);
     }
   };
 
@@ -661,11 +699,65 @@ export default function FeedPage() {
                     </div>
                   )}
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">{post.author.displayName}</span>
-                      <span className="text-gray-500 text-sm">@{post.author.username}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900">{post.author.displayName}</span>
+                        <span className="text-gray-500 text-sm">@{post.author.username}</span>
+                      </div>
+                      {post.author.id === currentUserId && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEditPost(post)}
+                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition cursor-pointer"
+                            title="Edit post"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => setDeletePostConfirm(post.id)}
+                            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition cursor-pointer"
+                            title="Delete post"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-gray-800 mt-2 whitespace-pre-wrap">{post.content}</p>
+                    {editingPost === post.id ? (
+                      <div className="mt-2 space-y-2">
+                        <textarea
+                          value={editPostContent}
+                          onChange={(e) => setEditPostContent(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                          rows={3}
+                          maxLength={500}
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleSavePost(post.id)}
+                            disabled={!editPostContent.trim()}
+                            className="px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingPost(null);
+                              setEditPostContent('');
+                            }}
+                            className="px-4 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer text-sm font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-gray-800 mt-2 whitespace-pre-wrap">{post.content}</p>
+                    )}
                     <div className="mt-4 flex items-center gap-4">
                       {/* Like Button */}
                       <button
@@ -817,7 +909,7 @@ export default function FeedPage() {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Comment Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 transform animate-scaleIn">
@@ -843,6 +935,39 @@ export default function FeedPage() {
                   className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition cursor-pointer"
                 >
                   Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Post Confirmation Modal */}
+      {deletePostConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 transform animate-scaleIn">
+            <div className="p-6">
+              <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 text-center mb-2">Delete Post?</h3>
+              <p className="text-gray-600 text-center mb-6">
+                This will permanently delete your post and all its comments. This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeletePostConfirm(null)}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeletePost(deletePostConfirm)}
+                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition cursor-pointer"
+                >
+                  Delete Post
                 </button>
               </div>
             </div>

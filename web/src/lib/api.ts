@@ -62,6 +62,28 @@ export const api = {
     return res.json();
   },
 
+  async updatePost(token: string, postId: string, content: string, mediaUrls?: string[]) {
+    const res = await fetch(`${API_URL}/posts/${postId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ content, mediaUrls }),
+    });
+    if (!res.ok) throw new Error('Failed to update post');
+    return res.json();
+  },
+
+  async deletePost(token: string, postId: string) {
+    const res = await fetch(`${API_URL}/posts/${postId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to delete post');
+    return res.json();
+  },
+
   async likePost(token: string, postId: string) {
     const res = await fetch(`${API_URL}/posts/${postId}/likes`, {
       method: 'POST',
