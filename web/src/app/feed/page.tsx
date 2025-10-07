@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 // Rolling counter animation (old value slides up, new value slides in)
 function RollingCounter({ value }: { value: number }) {
   const prevRef = useRef<number>(value);
-  const [displayValue, setDisplayValue] = useState(value);
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
@@ -12,56 +11,29 @@ function RollingCounter({ value }: { value: number }) {
     if (value === prev) return;
 
     setIsAnimating(true);
-    // Wait a frame so the animation can start
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setDisplayValue(value);
-      });
-    });
-
     const t = setTimeout(() => {
       prevRef.current = value;
       setIsAnimating(false);
-    }, 400);
+    }, 350);
     return () => clearTimeout(t);
   }, [value]);
 
   const prev = prevRef.current;
   const direction = value > prev ? 'up' : 'down';
-  const widthCh = String(Math.max(prev, value)).length + 0.5;
+  const widthCh = String(Math.max(prev, value, String(value).length + 1)).length + 0.5;
 
-  if (!isAnimating) {
-    return (
-      <span
-        className="inline-block align-middle"
-        style={{ width: `${widthCh}ch` }}
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        {value}
-      </span>
-    );
-  }
-
-  const prevClass = direction === 'up' 
-    ? (displayValue !== prev ? '-translate-y-full opacity-0' : 'translate-y-0')
-    : (displayValue !== prev ? 'translate-y-full opacity-0' : 'translate-y-0');
-    
-  const currClass = direction === 'up'
-    ? (displayValue === value ? 'translate-y-0' : 'translate-y-full')
-    : (displayValue === value ? 'translate-y-0' : '-translate-y-full');
+  const transformClass = isAnimating
+    ? (direction === 'up' ? '-translate-y-5' : 'translate-y-5')
+    : 'translate-y-0';
 
   return (
     <span
-      className="relative inline-block h-5 overflow-hidden align-middle"
-      style={{ width: `${widthCh}ch` }}
+      className="relative inline-block overflow-hidden align-middle"
+      style={{ width: `${widthCh}ch`, height: '1.25rem' }}
       aria-live="polite"
       aria-atomic="true"
     >
-      <span className={`absolute left-0 top-0 transition-all duration-300 ease-out ${prevClass}`}>
-        {prev}
-      </span>
-      <span className={`absolute left-0 top-0 transition-all duration-300 ease-out ${currClass}`}>
+      <span className={`block transition-transform duration-300 ease-out ${transformClass}`}>
         {value}
       </span>
     </span>
