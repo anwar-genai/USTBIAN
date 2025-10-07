@@ -697,69 +697,90 @@ export default function FeedPage() {
                     </div>
                     {expandedPostId === post.id && (
                       <div className="mt-4 border-t border-gray-200 pt-4 space-y-3">
+                        {/* Reply indicator */}
+                        {replyTo[post.id] && (
+                          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border-l-4 border-blue-500 rounded">
+                            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                            </svg>
+                            <span className="text-xs text-gray-700">
+                              Replying to <span className="font-semibold text-blue-700">{replyTo[post.id].author?.displayName || 'User'}</span>
+                            </span>
+                            <button
+                              onClick={() => setReplyTo((prev) => ({ ...prev, [post.id]: null }))}
+                              className="ml-auto text-xs text-gray-500 hover:text-gray-700 cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Comment input */}
                         <div className="flex gap-2">
                           <input
                             type="text"
                             value={newComment[post.id] || ''}
                             onChange={(e) => setNewComment((prev) => ({ ...prev, [post.id]: e.target.value }))}
-                            placeholder="Write a comment..."
+                            placeholder={replyTo[post.id] ? `Reply to ${replyTo[post.id].author?.displayName}...` : "Write a comment..."}
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleAddComment(post.id);
+                              }
+                            }}
                           />
                           <button
                             onClick={() => handleAddComment(post.id)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer"
+                            disabled={!newComment[post.id]?.trim()}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Send
+                            {replyTo[post.id] ? 'Reply' : 'Send'}
                           </button>
                         </div>
+
+                        {/* Comments list */}
                         <div className="space-y-2">
                           {(comments[post.id] || []).map((c) => (
-                            <div key={c.id} className={`flex items-start gap-2 ${c.parent ? 'pl-8 border-l border-gray-100' : ''}`}>
-                              <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-700 font-semibold">
+                            <div key={c.id} className={`flex items-start gap-2 ${c.parent ? 'pl-8 border-l-2 border-gray-200' : ''}`}>
+                              <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-700 font-semibold flex-shrink-0">
                                 {c.author?.displayName?.[0]?.toUpperCase() || 'U'}
                               </div>
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm font-semibold text-gray-900">{c.author?.displayName || 'User'}</span>
                                   <span className="text-xs text-gray-500">{formatDate(c.createdAt)}</span>
                                 </div>
-                                <p className="text-gray-800 text-sm mt-1 whitespace-pre-wrap">{c.content}</p>
+                                <p className="text-gray-800 text-sm mt-1 whitespace-pre-wrap break-words">{c.content}</p>
                                 <div className="mt-1 flex items-center gap-3">
                                   <button
                                     onClick={() => setReplyTo((prev) => ({ ...prev, [post.id]: c }))}
-                                    className="text-xs text-blue-600 hover:underline"
+                                    className="text-xs text-blue-600 hover:underline cursor-pointer"
                                   >
                                     Reply
                                   </button>
-                              {c.author?.id === currentUserId && (
-                                <button
-                                  onClick={() => handleDeleteComment(post.id, c.id)}
-                                  className="text-xs text-red-600 hover:text-red-700"
-                                >
-                                  Delete
-                                </button>
-                              )}
+                                  {c.author?.id === currentUserId && (
+                                    <button
+                                      onClick={() => handleDeleteComment(post.id, c.id)}
+                                      className="text-xs text-red-600 hover:text-red-700 cursor-pointer"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
                           ))}
                         </div>
-                        <div className="pt-2">
-                          <button
-                            onClick={() => loadComments(post.id)}
-                            className="text-sm text-gray-600 hover:text-gray-900"
-                          >
-                            Load more
-                          </button>
-                        </div>
-                        {replyTo[post.id] && (
-                          <div className="text-xs text-gray-500">
-                            Replying to: <span className="font-medium">{replyTo[post.id].author?.displayName || 'User'}</span>
+
+                        {/* Load more */}
+                        {comments[post.id] && comments[post.id].length > 0 && (
+                          <div className="pt-2">
                             <button
-                              onClick={() => setReplyTo((prev) => ({ ...prev, [post.id]: null }))}
-                              className="ml-2 text-blue-600 hover:underline"
+                              onClick={() => loadComments(post.id)}
+                              className="text-sm text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
                             >
-                              cancel
+                              Load more comments
                             </button>
                           </div>
                         )}
