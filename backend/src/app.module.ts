@@ -10,6 +10,8 @@ import { AuthModule } from './auth/auth.module';
 import { PostsModule } from './posts/posts.module';
 import { LikesModule } from './likes/likes.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { FollowsModule } from './follows/follows.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { RealtimeModule } from './realtime/realtime.module';
     PostsModule,
     RealtimeModule,
     LikesModule,
+    FollowsModule,
+    NotificationsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

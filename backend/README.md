@@ -3,12 +3,17 @@
 Backend API for the Ustbian university social app. Stack: NestJS v11, TypeORM (PostgreSQL), Passport (Local + JWT), Socket.IO.
 
 ### Features implemented
-- Auth: register, login (JWT), `GET /auth/me`
-- Users: create, get by id, update
-- Posts: list, create, get by id, update, delete
-- Likes: like/unlike a post with realtime events
-- Realtime: Socket.IO gateway emitting `post.like.added` and `post.like.removed`
-- Health: `GET /health`
+- **Auth**: register, login (JWT), `GET /auth/me`
+- **Users**: create, get by id, update profile
+- **Posts**: list, create, get by id, update, delete (with author authorization)
+- **Likes**: like/unlike posts with realtime Socket.IO events
+- **Follows**: follow/unfollow users, get followers/following lists
+- **Notifications**: create, list, mark as read (individual or all), realtime delivery
+- **Realtime**: Socket.IO gateway for:
+  - `post.like.added` / `post.like.removed`
+  - `notification.{userId}` for user-specific notifications
+- **Health**: `GET /health`
+- **Swagger docs**: available at `/docs` with full API documentation
 
 ### Prerequisites
 - Node.js LTS
@@ -70,10 +75,11 @@ POST /auth/login
 - Use the Authorize button to paste your Bearer JWT.
 - Try endpoints directly from the browser.
 
-### WebSocket testing
+### WebSocket (realtime) testing
 - Connect a Socket.IO client to `ws://localhost:3000` and listen for:
   - `post.like.added` { postId, userId }
   - `post.like.removed` { postId, userId }
+  - `notification.{userId}` for user-specific notification events
 
 ### Notes
 - TypeORM is configured with `synchronize: false`. For local bootstrapping, either:

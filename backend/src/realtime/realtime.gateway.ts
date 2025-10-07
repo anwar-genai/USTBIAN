@@ -16,6 +16,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   emitLikeRemoved(postId: string, userId: string) {
     this.server.emit('post.like.removed', { postId, userId });
   }
+
+  emitNotification(recipientId: string, notification: any) {
+    this.server.emit(`notification.${recipientId}`, notification);
+  }
 }
 
 
