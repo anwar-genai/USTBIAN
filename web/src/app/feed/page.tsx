@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getToken, clearToken } from '@/lib/auth';
+import { getSocket } from '@/lib/socket';
 
 interface Post {
   id: string;
@@ -17,12 +18,24 @@ interface Post {
   createdAt: string;
 }
 
+interface Notification {
+  id: string;
+  type: string;
+  message?: string;
+  read: boolean;
+  createdAt: string;
+}
+
 export default function FeedPage() {
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [newPost, setNewPost] = useState('');
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const token = getToken();
@@ -31,19 +44,58 @@ export default function FeedPage() {
       return;
     }
 
-    loadPosts();
+    loadData();
+    setupRealtimeListeners();
+
+    return () => {
+      const socket = getSocket();
+      socket.off('post.like.added');
+      socket.off('post.like.removed');
+    };
   }, [router]);
 
-  const loadPosts = async () => {
+  const loadData = async () => {
     try {
       const token = getToken();
       if (!token) return;
-      const data = await api.getPosts(token);
-      setPosts(data);
+
+      const [postsData, meData, notificationsData, likesData] = await Promise.all([
+        api.getPosts(token),
+        api.getMe(token),
+        api.getNotifications(token).catch(() => []),
+        api.getMyLikes(token).catch(() => ({ likedPostIds: [] })),
+      ]);
+
+      setPosts(postsData);
+      setCurrentUserId(meData.userId);
+      setNotifications(notificationsData);
+      setLikedPosts(new Set(likesData.likedPostIds));
     } catch (err) {
-      console.error('Failed to load posts', err);
+      console.error('Failed to load data', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const setupRealtimeListeners = () => {
+    const socket = getSocket();
+
+    socket.on('post.like.added', (data: { postId: string; userId: string }) => {
+      console.log('Like added:', data);
+      // Refresh posts to show updated like count if needed
+    });
+
+    socket.on('post.like.removed', (data: { postId: string; userId: string }) => {
+      console.log('Like removed:', data);
+    });
+
+    const token = getToken();
+    if (token) {
+      api.getMe(token).then((me) => {
+        socket.on(`notification.${me.userId}`, (notification: Notification) => {
+          setNotifications((prev) => [notification, ...prev]);
+        });
+      });
     }
   };
 
@@ -58,7 +110,7 @@ export default function FeedPage() {
     try {
       await api.createPost(token, newPost);
       setNewPost('');
-      await loadPosts();
+      await loadData();
     } catch (err) {
       console.error('Failed to create post', err);
     } finally {
@@ -66,9 +118,44 @@ export default function FeedPage() {
     }
   };
 
+  const handleLike = async (postId: string) => {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      if (likedPosts.has(postId)) {
+        await api.unlikePost(token, postId);
+        setLikedPosts((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(postId);
+          return newSet;
+        });
+      } else {
+        await api.likePost(token, postId);
+        setLikedPosts((prev) => new Set(prev).add(postId));
+      }
+    } catch (err) {
+      console.error('Failed to toggle like', err);
+    }
+  };
+
   const handleLogout = () => {
     clearToken();
     router.push('/login');
+  };
+
+  const handleNotificationClick = async (notificationId: string) => {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      await api.markNotificationAsRead(token, notificationId);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+      );
+    } catch (err) {
+      console.error('Failed to mark notification as read', err);
+    }
   };
 
   if (loading) {
@@ -79,19 +166,69 @@ export default function FeedPage() {
     );
   }
 
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Ustbian</h1>
-          <button
-            onClick={handleLogout}
-            className="text-sm text-gray-600 hover:text-gray-900 font-medium"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-4">
+            {/* Notifications Bell */}
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-2 text-gray-600 hover:text-gray-900 transition"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-gray-600 hover:text-gray-900 font-medium"
+            >
+              Logout
+            </button>
+          </div>
         </div>
+
+        {/* Notifications Dropdown */}
+        {showNotifications && (
+          <div className="absolute right-4 top-16 w-80 bg-white rounded-lg shadow-lg border border-gray-200 max-h-96 overflow-y-auto">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-900">Notifications</h3>
+            </div>
+            {notifications.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">No notifications</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {notifications.map((notif) => (
+                  <div
+                    key={notif.id}
+                    onClick={() => handleNotificationClick(notif.id)}
+                    className={`p-4 hover:bg-gray-50 cursor-pointer transition ${!notif.read ? 'bg-blue-50' : ''}`}
+                  >
+                    <p className="text-sm text-gray-800">{notif.message || notif.type}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {new Date(notif.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-6">
@@ -137,9 +274,32 @@ export default function FeedPage() {
                       <span className="font-semibold text-gray-900">{post.author.displayName}</span>
                       <span className="text-gray-500 text-sm">@{post.author.username}</span>
                     </div>
-                    <p className="text-gray-800 mt-2">{post.content}</p>
-                    <div className="mt-3 text-sm text-gray-500">
-                      {new Date(post.createdAt).toLocaleString()}
+                    <p className="text-gray-800 mt-2 whitespace-pre-wrap">{post.content}</p>
+                    <div className="mt-4 flex items-center gap-4">
+                      {/* Like Button */}
+                      <button
+                        onClick={() => handleLike(post.id)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition ${
+                          likedPosts.has(post.id)
+                            ? 'bg-red-50 text-red-600'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        <svg className="w-5 h-5" fill={likedPosts.has(post.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                          />
+                        </svg>
+                        <span className="text-sm font-medium">
+                          {likedPosts.has(post.id) ? 'Liked' : 'Like'}
+                        </span>
+                      </button>
+                      <span className="text-sm text-gray-500">
+                        {new Date(post.createdAt).toLocaleString()}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -151,4 +311,3 @@ export default function FeedPage() {
     </div>
   );
 }
-

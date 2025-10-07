@@ -5,6 +5,8 @@ import { LikeEntity } from './like.entity';
 import { User } from '../users/user.entity';
 import { PostEntity } from '../posts/post.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/notification.entity';
 
 @Injectable()
 export class LikesService {
@@ -13,19 +15,44 @@ export class LikesService {
     private readonly likesRepository: Repository<LikeEntity>,
     @InjectRepository(PostEntity)
     private readonly postsRepository: Repository<PostEntity>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
     private readonly realtime: RealtimeGateway,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async like(user: User, postId: string) {
-    const post = await this.postsRepository.findOne({ where: { id: postId } });
+    const post = await this.postsRepository.findOne({ where: { id: postId }, relations: ['author'] });
     if (!post) throw new ConflictException('Post not found');
-    const like = this.likesRepository.create({ user, post });
-    try {
-      await this.likesRepository.insert(like);
-    } catch (e) {
+    
+    // Check if already liked
+    const existing = await this.likesRepository.findOne({
+      where: { user: { id: user.id }, post: { id: postId } },
+    });
+    if (existing) {
       throw new ConflictException('Already liked');
     }
+
+    const like = this.likesRepository.create({ user, post });
+    await this.likesRepository.save(like);
+    
     this.realtime.emitLikeAdded(postId, user.id);
+
+    // Create notification for post author (if not liking own post)
+    if (post.author.id !== user.id) {
+      // Get user details for notification
+      const fullUser = await this.usersRepository.findOne({ where: { id: user.id } });
+      if (fullUser) {
+        await this.notificationsService.create(
+          post.author.id,
+          NotificationType.LIKE,
+          user.id,
+          `${fullUser.displayName} liked your post`,
+          { postId },
+        );
+      }
+    }
+
     return { success: true };
   }
 
@@ -45,6 +72,20 @@ export class LikesService {
   async unlikeByUserId(userId: string, postId: string) {
     const user = { id: userId } as User;
     return this.unlike(user, postId);
+  }
+
+  async checkLike(userId: string, postId: string) {
+    const existing = await this.likesRepository.findOne({
+      where: { user: { id: userId }, post: { id: postId } },
+    });
+    return { liked: !!existing };
+  }
+
+  async getLikesForPosts(userId: string, postIds: string[]) {
+    const likes = await this.likesRepository.find({
+      where: postIds.map((postId) => ({ user: { id: userId }, post: { id: postId } })),
+    });
+    return likes.map((like) => like.post.id);
   }
 }
 

@@ -105,5 +105,22 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch notifications');
     return res.json();
   },
+
+  async getMyLikes(token: string) {
+    const res = await fetch(`${API_URL}/likes/my`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch likes');
+    return res.json();
+  },
+
+  async markNotificationAsRead(token: string, notificationId: string) {
+    const res = await fetch(`${API_URL}/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to mark notification as read');
+    return res.json();
+  },
 };
 

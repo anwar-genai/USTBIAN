@@ -1,4 +1,4 @@
-import { Controller, Delete, Param, Post, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { LikesService } from './likes.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,6 +22,10 @@ export class LikesController {
   async unlike(@CurrentUserId() userId: string, @Param('postId') postId: string) {
     return this.likesService.unlikeByUserId(userId, postId);
   }
+
+  @Get()
+  @ApiOperation({ summary: 'Check if current user liked this post' })
+  async checkLike(@CurrentUserId() userId: string, @Param('postId') postId: string) {
+    return this.likesService.checkLike(userId, postId);
+  }
 }
-
-
