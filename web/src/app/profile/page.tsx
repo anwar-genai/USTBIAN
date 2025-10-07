@@ -26,6 +26,7 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -57,7 +58,12 @@ export default function ProfilePage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const f = e.target.files[0];
+      setSelectedFile(f);
+      setPreviewUrl((old) => {
+        if (old) URL.revokeObjectURL(old);
+        return URL.createObjectURL(f);
+      });
     }
   };
 
@@ -76,9 +82,20 @@ export default function ProfilePage() {
     setIsDragging(false);
     const files = e.dataTransfer.files;
     if (files && files[0]) {
-      setSelectedFile(files[0]);
+      const f = files[0];
+      setSelectedFile(f);
+      setPreviewUrl((old) => {
+        if (old) URL.revokeObjectURL(old);
+        return URL.createObjectURL(f);
+      });
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -105,6 +122,10 @@ export default function ProfilePage() {
       });
       
       setSelectedFile(null);
+      setPreviewUrl((old) => {
+        if (old) URL.revokeObjectURL(old);
+        return null;
+      });
       await loadProfile();
       setEditing(false);
     } catch (err) {
@@ -149,19 +170,25 @@ export default function ProfilePage() {
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow p-8">
-          {/* Avatar */}
+          {/* Avatar with live preview when editing */}
           <div className="flex flex-col items-center mb-6">
-            {user.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt={user.displayName}
-                className="w-24 h-24 rounded-full object-cover mb-4 border-2 border-gray-200"
-              />
-            ) : (
-              <div className="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-semibold mb-4">
-                {user.displayName[0].toUpperCase()}
-              </div>
-            )}
+            {(() => {
+              const displayAvatar = editing ? (previewUrl || user.avatarUrl) : user.avatarUrl;
+              if (displayAvatar) {
+                return (
+                  <img
+                    src={displayAvatar}
+                    alt={user.displayName}
+                    className="w-24 h-24 rounded-full object-cover mb-4 border-2 border-gray-200"
+                  />
+                );
+              }
+              return (
+                <div className="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-semibold mb-4">
+                  {user.displayName[0].toUpperCase()}
+                </div>
+              );
+            })()}
             {!editing && (
               <>
                 <h1 className="text-2xl font-bold text-gray-900">{user.displayName}</h1>
