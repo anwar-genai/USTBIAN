@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
@@ -500,5 +501,39 @@ class ApiService {
     throw Exception(
       'Failed to update profile: ${response.statusCode} ${response.body}',
     );
+  }
+
+  // Upload avatar image
+  static Future<String> uploadAvatar(File imageFile) async {
+    try {
+      final token = await _getToken();
+      if (token == null) throw Exception('No authentication token');
+
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/uploads/avatar'),
+      );
+
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Content-Type'] = 'multipart/form-data';
+
+      request.files.add(
+        await http.MultipartFile.fromPath('avatar', imageFile.path),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        return responseData['url']; // Assuming the API returns { "url": "/uploads/avatars/filename.jpg" }
+      } else {
+        throw Exception(
+          'Failed to upload avatar: ${response.statusCode} ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Failed to upload avatar: $e');
+    }
   }
 }
