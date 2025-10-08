@@ -7,6 +7,33 @@ import '../models/post.dart';
 class ApiService {
   static const String baseUrl = 'http://192.168.100.101:3000';
 
+  // Resolve relative URLs (e.g. "/uploads/avatar.jpg") to absolute
+  static String resolveUrl(String url) {
+    if (url.isEmpty) return url;
+    // If it's an absolute URL but points to localhost, rewrite to baseUrl host
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      final uri = Uri.tryParse(url);
+      final base = Uri.tryParse(baseUrl);
+      if (uri != null && base != null) {
+        if (uri.host == 'localhost' || uri.host == '127.0.0.1') {
+          return Uri(
+            scheme: base.scheme,
+            host: base.host,
+            port: base.hasPort ? base.port : null,
+            path: uri.path,
+            query: uri.query,
+          ).toString();
+        }
+      }
+      return url;
+    }
+    final String base = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    final String path = url.startsWith('/') ? url : '/$url';
+    return '$base$path';
+  }
+
   // Get stored token
   static Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();

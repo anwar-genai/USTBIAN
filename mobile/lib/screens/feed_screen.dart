@@ -304,15 +304,28 @@ class _PostCardState extends State<_PostCard>
                               width: 2,
                             ),
                           ),
-                          child: CircleAvatar(
-                            radius: 22,
-                            backgroundImage:
-                                widget.post.author.avatarUrl != null
-                                ? NetworkImage(widget.post.author.avatarUrl!)
-                                : null,
-                            backgroundColor: Colors.blue.shade100,
-                            child: widget.post.author.avatarUrl == null
-                                ? Text(
+                          child:
+                              (widget.post.author.avatarUrl != null &&
+                                  widget.post.author.avatarUrl!.isNotEmpty)
+                              ? CircleAvatar(
+                                  radius: 22,
+                                  backgroundColor: Colors.blue.shade100,
+                                  backgroundImage: NetworkImage(
+                                    ApiService.resolveUrl(
+                                      widget.post.author.avatarUrl!,
+                                    ),
+                                  ),
+                                  onBackgroundImageError:
+                                      (exception, stackTrace) {
+                                        print(
+                                          'Error loading avatar: $exception',
+                                        );
+                                      },
+                                )
+                              : CircleAvatar(
+                                  radius: 22,
+                                  backgroundColor: Colors.blue.shade100,
+                                  child: Text(
                                     widget.post.author.displayName[0]
                                         .toUpperCase(),
                                     style: const TextStyle(
@@ -320,9 +333,8 @@ class _PostCardState extends State<_PostCard>
                                       fontSize: 18,
                                       color: Colors.blue,
                                     ),
-                                  )
-                                : null,
-                          ),
+                                  ),
+                                ),
                         ),
                       ),
                     ),

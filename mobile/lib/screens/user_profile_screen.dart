@@ -104,18 +104,32 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     child: Column(
                       children: [
                         // Avatar
-                        CircleAvatar(
-                          radius: 50,
-                          backgroundImage: widget.user.avatarUrl != null
-                              ? NetworkImage(widget.user.avatarUrl!)
-                              : null,
-                          child: widget.user.avatarUrl == null
-                              ? Text(
+                        (widget.user.avatarUrl != null &&
+                                widget.user.avatarUrl!.isNotEmpty)
+                            ? CircleAvatar(
+                                radius: 50,
+                                backgroundColor: Colors.blue.shade100,
+                                backgroundImage: NetworkImage(
+                                  ApiService.resolveUrl(widget.user.avatarUrl!),
+                                ),
+                                onBackgroundImageError: (exception, stackTrace) {
+                                  print(
+                                    'Error loading profile avatar: $exception',
+                                  );
+                                },
+                              )
+                            : CircleAvatar(
+                                radius: 50,
+                                backgroundColor: Colors.blue.shade100,
+                                child: Text(
                                   widget.user.displayName[0].toUpperCase(),
-                                  style: const TextStyle(fontSize: 32),
-                                )
-                              : null,
-                        ),
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                              ),
                         const SizedBox(height: 16),
                         // Name and username
                         Text(
