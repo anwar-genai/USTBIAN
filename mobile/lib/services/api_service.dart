@@ -123,23 +123,49 @@ class ApiService {
     String username,
     String displayName,
   ) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/auth/register'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
+    try {
+      print('Registering user with email: $email, username: $username');
+
+      final requestBody = {
         'email': email,
         'password': password,
         'username': username,
         'displayName': displayName,
-      }),
-    );
+      };
 
-    if (response.statusCode == 201) {
-      final data = jsonDecode(response.body);
-      await _storeToken(data['token']);
-      return data;
-    } else {
-      throw Exception('Registration failed: ${response.body}');
+      print('Request body: ${jsonEncode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(requestBody),
+      );
+
+      print('Registration response status: ${response.statusCode}');
+      print('Registration response body: ${response.body}');
+
+      if (response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        // Handle both 'token' and 'access_token' fields
+        final token = data['token'] ?? data['access_token'];
+        if (token != null) {
+          await _storeToken(token);
+        }
+        return data;
+      } else {
+        // Try to parse error response
+        try {
+          final errorData = jsonDecode(response.body);
+          throw Exception(
+            'Registration failed: ${errorData['message'] ?? response.body}',
+          );
+        } catch (e) {
+          throw Exception('Registration failed: ${response.body}');
+        }
+      }
+    } catch (e) {
+      print('Registration error: $e');
+      rethrow;
     }
   }
 

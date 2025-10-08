@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'feed_screen.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -154,10 +155,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Register link
                 TextButton(
                   onPressed: () {
-                    // TODO: Navigate to register screen
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Register screen coming soon!'),
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const RegisterScreen(),
                       ),
                     );
                   },
