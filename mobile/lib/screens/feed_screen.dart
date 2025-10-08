@@ -106,17 +106,74 @@ class _FeedScreenState extends State<FeedScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.person),
+            icon: const Icon(Icons.notifications_none_outlined),
+            tooltip: 'Notifications',
             onPressed: () {
-              if (_currentUser != null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Notifications coming soon')),
+              );
+            },
+          ),
+          const SizedBox(width: 4),
+          PopupMenuButton<String>(
+            tooltip: 'Account',
+            offset: const Offset(0, 40),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            onSelected: (value) async {
+              if (value == 'profile' && _currentUser != null) {
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) =>
                         UserProfileScreen(user: _currentUser!),
                   ),
                 );
+              } else if (value == 'logout') {
+                await ApiService.logout();
+                // ignore: use_build_context_synchronously
+                Navigator.of(context).popUntil((route) => route.isFirst);
               }
             },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'profile',
+                child: ListTile(
+                  leading: Icon(Icons.person_outline),
+                  title: Text('View Profile'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: ListTile(
+                  leading: Icon(Icons.logout),
+                  title: Text('Logout'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child:
+                  (_currentUser != null &&
+                      _currentUser!.avatarUrl != null &&
+                      _currentUser!.avatarUrl!.isNotEmpty)
+                  ? CircleAvatar(
+                      radius: 16,
+                      backgroundImage: NetworkImage(
+                        ApiService.resolveUrl(_currentUser!.avatarUrl!),
+                      ),
+                    )
+                  : CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.white,
+                      child: const Icon(
+                        Icons.person_outline,
+                        color: Colors.black87,
+                      ),
+                    ),
+            ),
           ),
         ],
       ),
