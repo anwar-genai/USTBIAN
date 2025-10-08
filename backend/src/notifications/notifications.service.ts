@@ -128,13 +128,10 @@ export class NotificationsService {
     });
 
     if (notifications.length > 0) {
-      console.log(`Deleting ${notifications.length} follow notification(s) from ${actorId}`);
-
       const idsToDelete = notifications.map((n) => n.id);
       await this.notificationsRepository.remove(notifications);
 
       idsToDelete.forEach((id) => {
-        console.log(`Emitting deletion for follow notification ID: ${id}`);
         this.realtime.emitNotificationDeleted(recipientId, id);
       });
     }

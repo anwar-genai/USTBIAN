@@ -49,6 +49,7 @@ export class FollowsService {
       where: { follower: { id: followerId }, following: { id: followingId } },
     });
     if (!existing) return { success: true };
+    
     await this.followsRepository.remove(existing);
 
     // Delete the follow notification

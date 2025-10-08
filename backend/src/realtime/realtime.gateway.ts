@@ -22,7 +22,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   }
 
   emitNotificationDeleted(recipientId: string, notificationId: string) {
-    console.log(`Emitting notification deletion: recipientId=${recipientId}, notificationId=${notificationId}`);
     this.server.emit(`notification.deleted.${recipientId}`, { notificationId });
   }
 
