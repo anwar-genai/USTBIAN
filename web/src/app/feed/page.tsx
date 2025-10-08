@@ -510,11 +510,17 @@ export default function FeedPage() {
       if (showProfileMenu && !target.closest('.profile-dropdown') && !target.closest('.profile-menu-trigger')) {
         setShowProfileMenu(false);
       }
+
+      if (showSearch && !target.closest('.search-dropdown') && !target.closest('.search-button')) {
+        setShowSearch(false);
+        setSearchQuery('');
+        setSearchResults([]);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showNotifications, showProfileMenu]);
+  }, [showNotifications, showProfileMenu, showSearch]);
 
   // Keyboard: close on Escape and focus management
   useEffect(() => {
@@ -526,11 +532,16 @@ export default function FeedPage() {
           // return focus to trigger
           profileTriggerRef.current?.focus();
         }
+        if (showSearch) {
+          setShowSearch(false);
+          setSearchQuery('');
+          setSearchResults([]);
+        }
       }
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [showNotifications, showProfileMenu]);
+  }, [showNotifications, showProfileMenu, showSearch]);
 
   // Move focus into dropdowns when they open (basic a11y)
   useEffect(() => {
@@ -626,7 +637,7 @@ export default function FeedPage() {
                   setShowNotifications(false);
                   setShowProfileMenu(false);
                 }}
-                className="p-2 text-gray-600 hover:text-gray-900 transition focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
+                className="search-button p-2 text-gray-600 hover:text-gray-900 transition focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
                 title="Search users"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -635,7 +646,7 @@ export default function FeedPage() {
               </button>
 
               {showSearch && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-y-auto focus:outline-none">
+                <div className="search-dropdown absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-y-auto focus:outline-none">
                   <div className="p-3 border-b border-gray-200">
                     <input
                       type="text"
