@@ -310,23 +310,23 @@ class _UserProfileScreenState extends State<UserProfileScreen>
             ],
             child: Container(
               margin: const EdgeInsets.only(right: 8),
-              child: CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.white,
-                backgroundImage:
-                    (_currentUser?.avatarUrl != null &&
-                        _currentUser!.avatarUrl!.isNotEmpty)
-                    ? NetworkImage(
+              child:
+                  _currentUser?.avatarUrl != null &&
+                      _currentUser!.avatarUrl!.isNotEmpty
+                  ? CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.white,
+                      backgroundImage: NetworkImage(
                         ApiService.resolveUrl(_currentUser!.avatarUrl!),
-                      )
-                    : null,
-                onBackgroundImageError: (exception, stackTrace) {
-                  print('Error loading appbar avatar: $exception');
-                },
-                child:
-                    (_currentUser?.avatarUrl == null ||
-                        _currentUser?.avatarUrl?.isEmpty == true)
-                    ? Builder(
+                      ),
+                      onBackgroundImageError: (exception, stackTrace) {
+                        print('Error loading appbar avatar: $exception');
+                      },
+                    )
+                  : CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.white,
+                      child: Builder(
                         builder: (context) {
                           final displayName = _currentUser?.displayName;
                           if (displayName != null && displayName.isNotEmpty) {
@@ -345,9 +345,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                             color: Colors.blue,
                           );
                         },
-                      )
-                    : null,
-              ),
+                      ),
+                    ),
             ),
           ),
         ],
