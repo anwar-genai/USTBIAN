@@ -251,8 +251,9 @@ class _PostCardState extends State<_PostCard>
   }
 
   bool _isTextLong() {
-    // Check if text is longer than 3 lines (approximately 150 characters)
-    return widget.post.content.length > 150;
+    // Check if text has more than 3 lines or is longer than 150 characters
+    final lineCount = '\n'.allMatches(widget.post.content).length + 1;
+    return lineCount > 3 || widget.post.content.length > 150;
   }
 
   @override
@@ -386,7 +387,9 @@ class _PostCardState extends State<_PostCard>
                     Text(
                       widget.post.content,
                       maxLines: _isExpanded ? null : 3,
-                      overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                      overflow: _isExpanded
+                          ? TextOverflow.visible
+                          : TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 15,
                         height: 1.4,
