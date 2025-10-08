@@ -3,6 +3,10 @@ import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import '../models/post.dart';
 import '../models/user.dart';
+import 'create_post_screen.dart';
+import 'comments_screen.dart';
+import 'search_screen.dart';
+import 'user_profile_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -24,8 +28,15 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Future<void> _loadData() async {
     try {
+      print('Loading feed data...');
+      final token = await ApiService.getToken();
+      print('Token: ${token != null ? "Present" : "Missing"}');
+
       final user = await ApiService.getMe();
+      print('User loaded: ${user.username}');
+
       final posts = await ApiService.getPosts();
+      print('Posts loaded: ${posts.length} posts');
 
       setState(() {
         _currentUser = user;
@@ -33,6 +44,7 @@ class _FeedScreenState extends State<FeedScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      print('Error loading feed: $e');
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(
@@ -44,25 +56,29 @@ class _FeedScreenState extends State<FeedScreen> {
 
   Future<void> _likePost(String postId) async {
     try {
-      await ApiService.likePost(postId);
+      final postIndex = _posts.indexWhere((p) => p.id == postId);
+      if (postIndex == -1) return;
+
+      final post = _posts[postIndex];
+
+      if (post.isLiked) {
+        await ApiService.unlikePost(postId);
+      } else {
+        await ApiService.likePost(postId);
+      }
+
       setState(() {
-        final postIndex = _posts.indexWhere((p) => p.id == postId);
-        if (postIndex != -1) {
-          final post = _posts[postIndex];
-          _posts[postIndex] = Post(
-            id: post.id,
-            content: post.content,
-            imageUrl: post.imageUrl,
-            author: post.author,
-            createdAt: post.createdAt,
-            updatedAt: post.updatedAt,
-            likesCount: post.isLiked
-                ? post.likesCount - 1
-                : post.likesCount + 1,
-            commentsCount: post.commentsCount,
-            isLiked: !post.isLiked,
-          );
-        }
+        _posts[postIndex] = Post(
+          id: post.id,
+          content: post.content,
+          imageUrl: post.imageUrl,
+          author: post.author,
+          createdAt: post.createdAt,
+          updatedAt: post.updatedAt,
+          likesCount: post.isLiked ? post.likesCount - 1 : post.likesCount + 1,
+          commentsCount: post.commentsCount,
+          isLiked: !post.isLiked,
+        );
       });
     } catch (e) {
       if (mounted) {
@@ -84,19 +100,22 @@ class _FeedScreenState extends State<FeedScreen> {
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
-              // TODO: Implement search
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Search coming soon!')),
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const SearchScreen()),
               );
             },
           ),
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {
-              // TODO: Navigate to profile
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Profile coming soon!')),
-              );
+              if (_currentUser != null) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        UserProfileScreen(user: _currentUser!),
+                  ),
+                );
+              }
             },
           ),
         ],
@@ -125,11 +144,13 @@ class _FeedScreenState extends State<FeedScreen> {
                     ),
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Navigate to create post screen
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Create post coming soon!')),
+        onPressed: () async {
+          final result = await Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => const CreatePostScreen()),
           );
+          if (result == true) {
+            _loadData(); // Reload posts if a new post was created
+          }
         },
         child: const Icon(Icons.add),
       ),
@@ -155,34 +176,54 @@ class _PostCard extends StatelessWidget {
             // Author info
             Row(
               children: [
-                CircleAvatar(
-                  backgroundImage: post.author.avatarUrl != null
-                      ? NetworkImage(post.author.avatarUrl!)
-                      : null,
-                  child: post.author.avatarUrl == null
-                      ? Text(post.author.displayName[0].toUpperCase())
-                      : null,
+                GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            UserProfileScreen(user: post.author),
+                      ),
+                    );
+                  },
+                  child: CircleAvatar(
+                    backgroundImage: post.author.avatarUrl != null
+                        ? NetworkImage(post.author.avatarUrl!)
+                        : null,
+                    child: post.author.avatarUrl == null
+                        ? Text(post.author.displayName[0].toUpperCase())
+                        : null,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        post.author.displayName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              UserProfileScreen(user: post.author),
                         ),
-                      ),
-                      Text(
-                        '@${post.author.username}',
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
+                      );
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post.author.displayName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                    ],
+                        Text(
+                          '@${post.author.username}',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Text(
@@ -223,9 +264,10 @@ class _PostCard extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.comment_outlined),
                   onPressed: () {
-                    // TODO: Navigate to comments
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Comments coming soon!')),
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => CommentsScreen(post: post),
+                      ),
                     );
                   },
                 ),

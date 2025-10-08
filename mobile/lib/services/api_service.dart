@@ -13,6 +13,11 @@ class ApiService {
     return prefs.getString('token');
   }
 
+  // Public method to get token (for debugging)
+  static Future<String?> getToken() async {
+    return _getToken();
+  }
+
   // Store token
   static Future<void> _storeToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
@@ -116,15 +121,31 @@ class ApiService {
 
   // User operations
   static Future<User> getMe() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/auth/me'),
-      headers: await _getHeaders(),
-    );
+    try {
+      print('Fetching user info from: $baseUrl/auth/me');
+      final response = await http.get(
+        Uri.parse('$baseUrl/auth/me'),
+        headers: await _getHeaders(),
+      );
 
-    if (response.statusCode == 200) {
-      return User.fromJson(jsonDecode(response.body));
-    } else {
-      throw Exception('Failed to get user info');
+      print('User info response status: ${response.statusCode}');
+      print('User info response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        print('Parsed auth JSON: $json');
+
+        // /auth/me returns { userId: string }, so we need to fetch the full user
+        final userId = json['userId'] as String;
+        print('Fetching full user data for userId: $userId');
+
+        return await getUserById(userId);
+      } else {
+        throw Exception('Failed to get user info: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error in getMe: $e');
+      rethrow;
     }
   }
 
@@ -144,16 +165,28 @@ class ApiService {
 
   // Posts
   static Future<List<Post>> getPosts() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/posts'),
-      headers: await _getHeaders(),
-    );
+    try {
+      print('Fetching posts from: $baseUrl/posts');
+      final response = await http.get(
+        Uri.parse('$baseUrl/posts'),
+        headers: await _getHeaders(),
+      );
 
-    if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.map((json) => Post.fromJson(json)).toList();
-    } else {
-      throw Exception('Failed to get posts');
+      print('Posts response status: ${response.statusCode}');
+      print('Posts response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        print('Parsed ${data.length} posts');
+        return data.map((json) => Post.fromJson(json)).toList();
+      } else {
+        throw Exception(
+          'Failed to get posts: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      print('Error in getPosts: $e');
+      rethrow;
     }
   }
 
@@ -190,6 +223,149 @@ class ApiService {
 
     if (response.statusCode != 200) {
       throw Exception('Failed to unlike post');
+    }
+  }
+
+  // Comments
+  static Future<List<Map<String, dynamic>>> getComments(String postId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/posts/$postId/comments'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to get comments');
+    }
+  }
+
+  static Future<Map<String, dynamic>> createComment(
+    String postId,
+    String content,
+  ) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/posts/$postId/comments'),
+      headers: await _getHeaders(),
+      body: jsonEncode({'content': content}),
+    );
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to create comment');
+    }
+  }
+
+  static Future<void> deleteComment(String postId, String commentId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/posts/$postId/comments/$commentId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete comment');
+    }
+  }
+
+  // Notifications
+  static Future<List<Map<String, dynamic>>> getNotifications() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to get notifications');
+    }
+  }
+
+  static Future<void> markNotificationAsRead(String notificationId) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/notifications/$notificationId/read'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to mark notification as read');
+    }
+  }
+
+  static Future<void> markAllNotificationsAsRead() async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/notifications/read-all'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to mark all notifications as read');
+    }
+  }
+
+  // Follow system
+  static Future<void> followUser(String userId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/users/$userId/follow'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to follow user');
+    }
+  }
+
+  static Future<void> unfollowUser(String userId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/users/$userId/follow'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to unfollow user');
+    }
+  }
+
+  static Future<List<User>> getFollowers(String userId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/users/$userId/follow/followers'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => User.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to get followers');
+    }
+  }
+
+  static Future<List<User>> getFollowing(String userId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/users/$userId/follow/following'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => User.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to get following');
+    }
+  }
+
+  // User profile
+  static Future<User> getUserById(String userId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/users/$userId'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return User.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Failed to get user');
     }
   }
 }

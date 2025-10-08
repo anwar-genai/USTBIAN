@@ -24,10 +24,20 @@ class Post {
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
+    // Handle mediaUrls array from backend (take first one if exists)
+    String? imageUrl;
+    if (json['mediaUrls'] != null &&
+        json['mediaUrls'] is List &&
+        (json['mediaUrls'] as List).isNotEmpty) {
+      imageUrl = json['mediaUrls'][0];
+    } else if (json['imageUrl'] != null) {
+      imageUrl = json['imageUrl'];
+    }
+
     return Post(
       id: json['id'],
       content: json['content'],
-      imageUrl: json['imageUrl'],
+      imageUrl: imageUrl,
       author: User.fromJson(json['author']),
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: DateTime.parse(json['updatedAt']),

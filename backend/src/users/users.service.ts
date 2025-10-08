@@ -44,6 +44,20 @@ export class UsersService {
     Object.assign(user, updateDto);
     return await this.usersRepository.save(user);
   }
+
+  async search(query: string, limit: number = 20): Promise<User[]> {
+    if (!query || query.trim().length === 0) {
+      return [];
+    }
+    
+    // Search by username or display name (case-insensitive)
+    return await this.usersRepository
+      .createQueryBuilder('user')
+      .where('LOWER(user.username) LIKE LOWER(:query)', { query: `%${query}%` })
+      .orWhere('LOWER(user.displayName) LIKE LOWER(:query)', { query: `%${query}%` })
+      .take(limit)
+      .getMany();
+  }
 }
 
 
