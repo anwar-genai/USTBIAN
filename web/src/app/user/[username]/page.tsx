@@ -118,8 +118,8 @@ export default function UserProfilePage() {
       const token = getToken();
       if (!token) return;
 
-      const [meData, userData, notificationsData] = await Promise.all([
-        api.getMe(token),
+      const meData = await api.getMe(token);
+      const [userData, notificationsData] = await Promise.all([
         api.getUserById(token, meData.userId),
         api.getNotifications(token).catch(() => []),
       ]);
