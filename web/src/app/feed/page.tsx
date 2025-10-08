@@ -444,8 +444,10 @@ export default function FeedPage() {
         prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
       );
 
-      // Navigate to post if metadata contains postId
-      if (notification.metadata?.postId) {
+      // Navigate based on notification type
+      if (notification.type === 'follow' && notification.metadata?.followerUsername) {
+        router.push(`/user/${notification.metadata.followerUsername}`);
+      } else if (notification.metadata?.postId) {
         router.push(`/post/${notification.metadata.postId}`);
       }
     } catch (err) {
@@ -862,17 +864,19 @@ export default function FeedPage() {
             posts.map((post) => (
               <div key={post.id} className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-start gap-3">
-                  {post.author.avatarUrl ? (
-                    <img
-                      src={post.author.avatarUrl}
-                      alt={post.author.displayName}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-                      {post.author.displayName[0].toUpperCase()}
-                    </div>
-                  )}
+                  <a href={`/user/${post.author.username}`} className="flex-shrink-0 cursor-pointer">
+                    {post.author.avatarUrl ? (
+                      <img
+                        src={post.author.avatarUrl}
+                        alt={post.author.displayName}
+                        className="w-10 h-10 rounded-full object-cover hover:opacity-80 transition"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold hover:bg-blue-700 transition">
+                        {post.author.displayName[0].toUpperCase()}
+                      </div>
+                    )}
+                  </a>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">

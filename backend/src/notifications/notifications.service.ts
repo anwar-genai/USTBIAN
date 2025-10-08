@@ -117,5 +117,29 @@ export class NotificationsService {
 
     return { success: true, deleted: toDelete.length };
   }
+
+  async deleteFollowNotification(recipientId: string, actorId: string) {
+    const notifications = await this.notificationsRepository.find({
+      where: {
+        recipient: { id: recipientId },
+        actor: { id: actorId },
+        type: NotificationType.FOLLOW,
+      },
+    });
+
+    if (notifications.length > 0) {
+      console.log(`Deleting ${notifications.length} follow notification(s) from ${actorId}`);
+
+      const idsToDelete = notifications.map((n) => n.id);
+      await this.notificationsRepository.remove(notifications);
+
+      idsToDelete.forEach((id) => {
+        console.log(`Emitting deletion for follow notification ID: ${id}`);
+        this.realtime.emitNotificationDeleted(recipientId, id);
+      });
+    }
+
+    return { success: true, deleted: notifications.length };
+  }
 }
 

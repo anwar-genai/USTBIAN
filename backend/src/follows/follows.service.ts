@@ -32,13 +32,13 @@ export class FollowsService {
     const follow = this.followsRepository.create({ follower, following });
     await this.followsRepository.save(follow);
 
-    // Create notification for the user being followed
+    // Create notification for the user being followed with username for profile link
     await this.notificationsService.create(
       followingId,
       NotificationType.FOLLOW,
       followerId,
       `${follower.displayName} started following you`,
-      { followerId }
+      { followerId, followerUsername: follower.username }
     );
 
     return { success: true };
@@ -50,6 +50,10 @@ export class FollowsService {
     });
     if (!existing) return { success: true };
     await this.followsRepository.remove(existing);
+
+    // Delete the follow notification
+    await this.notificationsService.deleteFollowNotification(followingId, followerId);
+
     return { success: true };
   }
 
