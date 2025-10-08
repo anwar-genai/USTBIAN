@@ -146,9 +146,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Fetch notifications on mount
+  // Fetch notifications on mount and poll every 30 seconds
   useEffect(() => {
     fetchNotifications();
+    
+    // Poll for notifications every 30 seconds as a fallback
+    const interval = setInterval(() => {
+      fetchNotifications();
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(interval);
   }, []);
 
 
