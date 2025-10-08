@@ -92,6 +92,11 @@ export default function FeedPage() {
   const [editingPost, setEditingPost] = useState<string | null>(null);
   const [editPostContent, setEditPostContent] = useState<string>('');
   const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const formatDate = (iso: string) => {
     try {
@@ -463,6 +468,34 @@ export default function FeedPage() {
     }
   };
 
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      const token = getToken();
+      if (!token) return;
+
+      setSearching(true);
+      try {
+        const results = await api.searchUsers(token, query);
+        setSearchResults(results);
+      } catch (err) {
+        console.error('Failed to search users', err);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+  };
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -583,6 +616,72 @@ export default function FeedPage() {
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Ustbian</h1>
           <div className="flex items-center gap-4">
+            {/* Search (anchored) */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setShowSearch((v) => !v);
+                  setShowNotifications(false);
+                  setShowProfileMenu(false);
+                }}
+                className="p-2 text-gray-600 hover:text-gray-900 transition focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
+                title="Search users"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+
+              {showSearch && (
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-y-auto focus:outline-none">
+                  <div className="p-3 border-b border-gray-200">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => handleSearch(e.target.value)}
+                      placeholder="Search users..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      autoFocus
+                    />
+                  </div>
+                  {searching ? (
+                    <div className="p-4 text-center text-gray-500">Searching...</div>
+                  ) : searchResults.length === 0 && searchQuery.trim() ? (
+                    <div className="p-4 text-center text-gray-500">No users found</div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">Type to search users</div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {searchResults.map((user: any) => (
+                        <a
+                          key={user.id}
+                          href={`/user/${user.username}`}
+                          className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition"
+                          onClick={() => {
+                            setShowSearch(false);
+                            setSearchQuery('');
+                            setSearchResults([]);
+                          }}
+                        >
+                          {user.avatarUrl ? (
+                            <img src={user.avatarUrl} alt={user.displayName} className="w-10 h-10 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
+                              {user.displayName[0].toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 truncate">{user.displayName}</p>
+                            <p className="text-sm text-gray-600 truncate">@{user.username}</p>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Notifications (anchored) */}
             <div className="relative">
               <button
@@ -777,8 +876,18 @@ export default function FeedPage() {
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-gray-900">{post.author.displayName}</span>
-                        <span className="text-gray-500 text-sm">@{post.author.username}</span>
+                        <a 
+                          href={`/user/${post.author.username}`}
+                          className="font-semibold text-gray-900 hover:text-blue-600 hover:underline transition cursor-pointer"
+                        >
+                          {post.author.displayName}
+                        </a>
+                        <a 
+                          href={`/user/${post.author.username}`}
+                          className="text-gray-500 text-sm hover:text-blue-600 transition cursor-pointer"
+                        >
+                          @{post.author.username}
+                        </a>
                         <span className="text-gray-400 text-xs">· {formatTimeAgo(post.createdAt)}</span>
                       </div>
                       {post.author.id === currentUserId && (

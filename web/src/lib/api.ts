@@ -216,5 +216,31 @@ export const api = {
     if (!res.ok) throw new Error('Failed to delete comment');
     return res.json();
   },
+
+  // User search
+  async searchUsers(token: string, query: string, limit = 20) {
+    const res = await fetch(`${API_URL}/users/search?q=${encodeURIComponent(query)}&limit=${limit}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to search users');
+    return res.json();
+  },
+
+  // Followers/Following
+  async getFollowers(token: string, userId: string) {
+    const res = await fetch(`${API_URL}/users/${userId}/follow/followers`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch followers');
+    return res.json();
+  },
+
+  async getFollowing(token: string, userId: string) {
+    const res = await fetch(`${API_URL}/users/${userId}/follow/following`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch following');
+    return res.json();
+  },
 };
 

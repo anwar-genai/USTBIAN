@@ -29,6 +29,8 @@ export default function ProfilePage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   useEffect(() => {
     loadProfile();
@@ -48,6 +50,14 @@ export default function ProfilePage() {
       setDisplayName(userData.displayName);
       setBio(userData.bio || '');
       setAvatarUrl(userData.avatarUrl || '');
+
+      // Load followers and following
+      const [followers, following] = await Promise.all([
+        api.getFollowers(token, meData.userId),
+        api.getFollowing(token, meData.userId),
+      ]);
+      setFollowersCount(followers.length);
+      setFollowingCount(following.length);
     } catch (err) {
       console.error('Failed to load profile', err);
       router.push('/login');
@@ -196,6 +206,20 @@ export default function ProfilePage() {
               </>
             )}
           </div>
+
+          {/* Followers/Following Stats */}
+          {!editing && (
+            <div className="flex justify-center gap-8 mb-6 border-t border-b border-gray-200 py-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-gray-900">{followersCount}</p>
+                <p className="text-sm text-gray-600">Followers</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-gray-900">{followingCount}</p>
+                <p className="text-sm text-gray-600">Following</p>
+              </div>
+            </div>
+          )}
 
           {editing ? (
             /* Edit Mode */
