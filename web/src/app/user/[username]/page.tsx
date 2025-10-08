@@ -169,14 +169,14 @@ export default function UserProfilePage() {
 
           {/* Followers/Following Stats */}
           <div className="flex justify-center gap-8 mb-6 border-t border-b border-gray-200 py-4">
-            <div className="text-center">
+            <Link href={`/user/${username}/followers`} className="text-center hover:bg-gray-50 -m-2 p-2 rounded transition cursor-pointer">
               <p className="text-2xl font-bold text-gray-900">{followersCount}</p>
               <p className="text-sm text-gray-600">Followers</p>
-            </div>
-            <div className="text-center">
+            </Link>
+            <Link href={`/user/${username}/following`} className="text-center hover:bg-gray-50 -m-2 p-2 rounded transition cursor-pointer">
               <p className="text-2xl font-bold text-gray-900">{followingCount}</p>
               <p className="text-sm text-gray-600">Following</p>
-            </div>
+            </Link>
           </div>
 
           {/* Actions */}
