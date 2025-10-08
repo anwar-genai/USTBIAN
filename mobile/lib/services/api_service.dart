@@ -231,6 +231,12 @@ class ApiService {
     }
   }
 
+  // Fetch posts authored by a specific user (client-side filter over /posts)
+  static Future<List<Post>> getPostsByUser(String userId) async {
+    final all = await getPosts();
+    return all.where((p) => p.author.id == userId).toList();
+  }
+
   // Returns true if like state changed (created), false if it was already liked
   static Future<bool> likePost(String postId) async {
     final response = await http.post(

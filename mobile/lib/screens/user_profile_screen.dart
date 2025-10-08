@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/user.dart';
+import '../models/post.dart';
+import 'comments_screen.dart';
 import 'followers_screen.dart';
 import 'following_screen.dart';
 
@@ -19,6 +21,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   bool _isLoading = true;
   int _followersCount = 0;
   int _followingCount = 0;
+  List<Post> _posts = [];
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -31,12 +35,32 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       final currentUser = await ApiService.getMe();
       final followers = await ApiService.getFollowers(widget.user.id);
       final following = await ApiService.getFollowing(widget.user.id);
+      final posts = await ApiService.getPostsByUser(widget.user.id);
+      Set<String> likedIds = {};
+      try {
+        likedIds = await ApiService.getMyLikedPostIds();
+      } catch (_) {}
 
       setState(() {
         _currentUser = currentUser;
         _followersCount = followers.length;
         _followingCount = following.length;
         _isFollowing = followers.any((f) => f.id == currentUser.id);
+        _posts = posts
+            .map(
+              (p) => Post(
+                id: p.id,
+                content: p.content,
+                imageUrl: p.imageUrl,
+                author: p.author,
+                createdAt: p.createdAt,
+                updatedAt: p.updatedAt,
+                likesCount: p.likesCount,
+                commentsCount: p.commentsCount,
+                isLiked: likedIds.contains(p.id),
+              ),
+            )
+            .toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -46,6 +70,48 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text('Failed to load profile: $e')));
       }
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _isRefreshing = true);
+    await _loadData();
+    if (mounted) setState(() => _isRefreshing = false);
+  }
+
+  Future<void> _likePost(String postId) async {
+    try {
+      final idx = _posts.indexWhere((p) => p.id == postId);
+      if (idx == -1) return;
+      final post = _posts[idx];
+      bool changed;
+      if (post.isLiked) {
+        changed = await ApiService.unlikePost(postId);
+      } else {
+        changed = await ApiService.likePost(postId);
+      }
+      if (changed) {
+        setState(() {
+          _posts[idx] = Post(
+            id: post.id,
+            content: post.content,
+            imageUrl: post.imageUrl,
+            author: post.author,
+            createdAt: post.createdAt,
+            updatedAt: post.updatedAt,
+            likesCount: post.isLiked
+                ? post.likesCount - 1
+                : post.likesCount + 1,
+            commentsCount: post.commentsCount,
+            isLiked: !post.isLiked,
+          );
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to like post: $e')));
     }
   }
 
@@ -95,8 +161,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
+          : RefreshIndicator(
+              onRefresh: _refresh,
+              child: ListView(
                 children: [
                   // Profile header
                   Container(
@@ -222,6 +289,32 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       ],
                     ),
                   ),
+                  // Posts list
+                  if (_posts.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 48),
+                      child: Column(
+                        children: const [
+                          Icon(
+                            Icons.article_outlined,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'No posts yet',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ..._posts.map(
+                      (p) => _ProfilePostCard(
+                        post: p,
+                        onLike: () => _likePost(p.id),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -252,6 +345,86 @@ class _StatButton extends StatelessWidget {
           ),
           Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey)),
         ],
+      ),
+    );
+  }
+}
+
+class _ProfilePostCard extends StatelessWidget {
+  final Post post;
+  final VoidCallback onLike;
+
+  const _ProfilePostCard({required this.post, required this.onLike});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Content
+            Text(
+              post.content,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.4,
+                color: Colors.black87,
+              ),
+              maxLines: 6,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (post.imageUrl != null) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  post.imageUrl!,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                IconButton(
+                  icon: Icon(
+                    post.isLiked ? Icons.favorite : Icons.favorite_border,
+                    color: post.isLiked ? Colors.red : Colors.grey.shade600,
+                  ),
+                  onPressed: onLike,
+                ),
+                Text('${post.likesCount}'),
+                const SizedBox(width: 16),
+                IconButton(
+                  icon: const Icon(Icons.comment_outlined),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => CommentsScreen(post: post),
+                      ),
+                    );
+                  },
+                ),
+                Text('${post.commentsCount}'),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
