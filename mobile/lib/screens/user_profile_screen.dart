@@ -9,7 +9,7 @@ import 'user_profile_edit_screen.dart';
 import 'followers_screen.dart';
 import 'following_screen.dart';
 import 'search_screen.dart';
-import 'feed_screen.dart';
+import '../main.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final User user;
@@ -277,10 +277,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 case 'logout':
                   await ApiService.logout();
                   if (mounted) {
-                    Navigator.of(context).pushReplacement(
+                    // Navigate to login screen and clear the entire navigation stack
+                    Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
-                        builder: (context) => const FeedScreen(),
+                        builder: (context) => const AuthWrapper(),
                       ),
+                      (route) => false,
                     );
                   }
                   break;
