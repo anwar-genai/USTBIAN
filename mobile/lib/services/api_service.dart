@@ -233,23 +233,28 @@ class ApiService {
 
   static Future<void> likePost(String postId) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/posts/$postId/like'),
+      Uri.parse('$baseUrl/posts/$postId/likes'),
       headers: await _getHeaders(),
     );
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to like post');
+    // Backend may return 201 Created or 200 OK
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception(
+        'Failed to like post: ${response.statusCode} ${response.body}',
+      );
     }
   }
 
   static Future<void> unlikePost(String postId) async {
     final response = await http.delete(
-      Uri.parse('$baseUrl/posts/$postId/like'),
+      Uri.parse('$baseUrl/posts/$postId/likes'),
       headers: await _getHeaders(),
     );
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to unlike post');
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception(
+        'Failed to unlike post: ${response.statusCode} ${response.body}',
+      );
     }
   }
 
