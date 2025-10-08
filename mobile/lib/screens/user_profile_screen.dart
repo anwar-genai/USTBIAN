@@ -3,6 +3,8 @@ import '../services/api_service.dart';
 import '../models/user.dart';
 import '../models/post.dart';
 import 'comments_screen.dart';
+import 'create_post_screen.dart';
+import 'package:intl/intl.dart';
 import 'followers_screen.dart';
 import 'following_screen.dart';
 
@@ -215,14 +217,42 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // Bio
-                        if (widget.user.bio != null &&
-                            widget.user.bio!.isNotEmpty)
-                          Text(
-                            widget.user.bio!,
+                        // Bio (show placeholder if empty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            (widget.user.bio != null &&
+                                    widget.user.bio!.isNotEmpty)
+                                ? widget.user.bio!
+                                : 'No bio yet',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 16),
+                            style: TextStyle(
+                              fontSize: 16,
+                              color:
+                                  (widget.user.bio != null &&
+                                      widget.user.bio!.isNotEmpty)
+                                  ? Colors.black87
+                                  : Colors.grey,
+                            ),
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Joined date
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.calendar_today,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Joined ${DateFormat('MMMM yyyy').format(widget.user.createdAt)}',
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 24),
                         // Follow stats
                         Row(
@@ -254,7 +284,59 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
+                        // Owner actions: Edit profile, New post
+                        if (_currentUser != null &&
+                            _currentUser!.id == widget.user.id)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Edit profile coming soon',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: const Text('Edit Profile'),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final result = await Navigator.of(context)
+                                        .push(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const CreatePostScreen(),
+                                          ),
+                                        );
+                                    if (result == true) {
+                                      await _refresh();
+                                    }
+                                  },
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('New Post'),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        const SizedBox(height: 8),
                         // Follow button
                         if (_currentUser != null &&
                             _currentUser!.id != widget.user.id)

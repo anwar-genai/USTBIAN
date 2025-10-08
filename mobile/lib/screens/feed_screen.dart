@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 // import 'package:provider/provider.dart';
 import '../services/api_service.dart';
+import 'package:mobile/main.dart';
 import '../models/post.dart';
 import '../models/user.dart';
 import 'create_post_screen.dart';
@@ -161,7 +162,10 @@ class _FeedScreenState extends State<FeedScreen> {
               } else if (value == 'logout') {
                 await ApiService.logout();
                 // ignore: use_build_context_synchronously
-                Navigator.of(context).popUntil((route) => route.isFirst);
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const AuthWrapper()),
+                  (route) => false,
+                );
               }
             },
             itemBuilder: (context) => [
