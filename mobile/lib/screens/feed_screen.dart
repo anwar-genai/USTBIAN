@@ -220,6 +220,7 @@ class _PostCardState extends State<_PostCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _likeAnimationController;
   late Animation<double> _likeAnimation;
+  bool _isExpanded = false;
 
   @override
   void initState() {
@@ -247,6 +248,11 @@ class _PostCardState extends State<_PostCard>
     _likeAnimationController.forward().then((_) {
       _likeAnimationController.reverse();
     });
+  }
+
+  bool _isTextLong() {
+    // Check if text is longer than 3 lines (approximately 150 characters)
+    return widget.post.content.length > 150;
   }
 
   @override
@@ -374,13 +380,39 @@ class _PostCardState extends State<_PostCard>
                 ),
                 const SizedBox(height: 12),
                 // Post content
-                Text(
-                  widget.post.content,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    height: 1.4,
-                    color: Colors.black87,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.post.content,
+                      maxLines: _isExpanded ? null : 3,
+                      overflow: _isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        height: 1.4,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    if (_isTextLong())
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isExpanded = !_isExpanded;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            _isExpanded ? 'Show less' : 'Read more',
+                            style: const TextStyle(
+                              color: Colors.blue,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 if (widget.post.imageUrl != null) ...[
                   const SizedBox(height: 12),
