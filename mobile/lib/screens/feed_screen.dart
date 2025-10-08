@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+// import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import '../models/post.dart';
 import '../models/user.dart';
@@ -38,9 +38,33 @@ class _FeedScreenState extends State<FeedScreen> {
       final posts = await ApiService.getPosts();
       print('Posts loaded: ${posts.length} posts');
 
+      // Fetch liked post IDs and mark posts accordingly
+      Set<String> likedIds = {};
+      try {
+        likedIds = await ApiService.getMyLikedPostIds();
+        print('Liked posts: ${likedIds.length}');
+      } catch (e) {
+        // Non-fatal: proceed without liked state if endpoint fails
+        print('Failed to fetch my likes: $e');
+      }
+
       setState(() {
         _currentUser = user;
-        _posts = posts;
+        _posts = posts
+            .map(
+              (p) => Post(
+                id: p.id,
+                content: p.content,
+                imageUrl: p.imageUrl,
+                author: p.author,
+                createdAt: p.createdAt,
+                updatedAt: p.updatedAt,
+                likesCount: p.likesCount,
+                commentsCount: p.commentsCount,
+                isLiked: likedIds.contains(p.id),
+              ),
+            )
+            .toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -61,25 +85,30 @@ class _FeedScreenState extends State<FeedScreen> {
 
       final post = _posts[postIndex];
 
+      bool changed;
       if (post.isLiked) {
-        await ApiService.unlikePost(postId);
+        changed = await ApiService.unlikePost(postId);
       } else {
-        await ApiService.likePost(postId);
+        changed = await ApiService.likePost(postId);
       }
 
-      setState(() {
-        _posts[postIndex] = Post(
-          id: post.id,
-          content: post.content,
-          imageUrl: post.imageUrl,
-          author: post.author,
-          createdAt: post.createdAt,
-          updatedAt: post.updatedAt,
-          likesCount: post.isLiked ? post.likesCount - 1 : post.likesCount + 1,
-          commentsCount: post.commentsCount,
-          isLiked: !post.isLiked,
-        );
-      });
+      if (changed) {
+        setState(() {
+          _posts[postIndex] = Post(
+            id: post.id,
+            content: post.content,
+            imageUrl: post.imageUrl,
+            author: post.author,
+            createdAt: post.createdAt,
+            updatedAt: post.updatedAt,
+            likesCount: post.isLiked
+                ? post.likesCount - 1
+                : post.likesCount + 1,
+            commentsCount: post.commentsCount,
+            isLiked: !post.isLiked,
+          );
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(

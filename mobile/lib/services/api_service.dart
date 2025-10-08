@@ -231,30 +231,99 @@ class ApiService {
     }
   }
 
-  static Future<void> likePost(String postId) async {
+  // Returns true if like state changed (created), false if it was already liked
+  static Future<bool> likePost(String postId) async {
     final response = await http.post(
       Uri.parse('$baseUrl/posts/$postId/likes'),
       headers: await _getHeaders(),
     );
 
     // Backend may return 201 Created or 200 OK
+    if (response.statusCode == 409) {
+      // Already liked - treat as success (no-op)
+      return false;
+    }
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception(
         'Failed to like post: ${response.statusCode} ${response.body}',
       );
     }
+    return true;
   }
 
-  static Future<void> unlikePost(String postId) async {
+  // Returns true if unlike state changed (deleted), false if it was already unliked
+  static Future<bool> unlikePost(String postId) async {
     final response = await http.delete(
       Uri.parse('$baseUrl/posts/$postId/likes'),
       headers: await _getHeaders(),
     );
 
+    if (response.statusCode == 409) {
+      // Already unliked - treat as success (no-op)
+      return false;
+    }
     if (response.statusCode != 200 && response.statusCode != 204) {
       throw Exception(
         'Failed to unlike post: ${response.statusCode} ${response.body}',
       );
+    }
+    return true;
+  }
+
+  // Likes - fetch posts liked by the current user
+  static Future<Set<String>> getMyLikedPostIds() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/likes/my'),
+      headers: await _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final dynamic decoded = jsonDecode(response.body);
+      final Set<String> ids = {};
+
+      List<dynamic>? list;
+      if (decoded is List) {
+        list = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        // Try common wrappers
+        for (final key in [
+          'likedPostIds',
+          'data',
+          'items',
+          'likes',
+          'results',
+        ]) {
+          final v = decoded[key];
+          if (v is List) {
+            list = v;
+            break;
+          }
+        }
+      }
+
+      if (list != null) {
+        for (final item in list) {
+          if (item is String) {
+            ids.add(item);
+          } else if (item is Map<String, dynamic>) {
+            // Possible shapes:
+            // 1) { postId: '...' }
+            // 2) { post: { id: '...' } }
+            // 3) { id: '...', content: '...', ... } (direct Post)
+            final byPostId = item['postId'];
+            final byNested = (item['post'] is Map<String, dynamic>)
+                ? item['post']['id']
+                : null;
+            final byDirectPost = item['id'];
+            final id = byPostId ?? byNested ?? byDirectPost;
+            if (id is String) ids.add(id);
+          }
+        }
+      }
+
+      return ids;
+    } else {
+      throw Exception('Failed to fetch my likes: ${response.statusCode}');
     }
   }
 
