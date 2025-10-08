@@ -5,6 +5,7 @@ import '../models/post.dart';
 import 'comments_screen.dart';
 import 'create_post_screen.dart';
 import 'package:intl/intl.dart';
+import 'user_profile_edit_screen.dart';
 import 'followers_screen.dart';
 import 'following_screen.dart';
 
@@ -19,6 +20,7 @@ class UserProfileScreen extends StatefulWidget {
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
   User? _currentUser;
+  User? _profileUser;
   bool _isFollowing = false;
   bool _isLoading = true;
   int _followersCount = 0;
@@ -35,9 +37,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   Future<void> _loadData() async {
     try {
       final currentUser = await ApiService.getMe();
-      final followers = await ApiService.getFollowers(widget.user.id);
-      final following = await ApiService.getFollowing(widget.user.id);
-      final posts = await ApiService.getPostsByUser(widget.user.id);
+      final viewUser = await ApiService.getUserById(widget.user.id);
+      final followers = await ApiService.getFollowers(viewUser.id);
+      final following = await ApiService.getFollowing(viewUser.id);
+      final posts = await ApiService.getPostsByUser(viewUser.id);
       Set<String> likedIds = {};
       try {
         likedIds = await ApiService.getMyLikedPostIds();
@@ -45,6 +48,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
       setState(() {
         _currentUser = currentUser;
+        _profileUser = viewUser;
         _followersCount = followers.length;
         _followingCount = following.length;
         _isFollowing = followers.any((f) => f.id == currentUser.id);
@@ -157,7 +161,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.user.displayName),
+        title: Text(_profileUser?.displayName ?? ''),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
       ),
@@ -173,13 +177,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     child: Column(
                       children: [
                         // Avatar
-                        (widget.user.avatarUrl != null &&
-                                widget.user.avatarUrl!.isNotEmpty)
+                        (_profileUser?.avatarUrl != null &&
+                                _profileUser!.avatarUrl!.isNotEmpty)
                             ? CircleAvatar(
                                 radius: 50,
                                 backgroundColor: Colors.blue.shade100,
                                 backgroundImage: NetworkImage(
-                                  ApiService.resolveUrl(widget.user.avatarUrl!),
+                                  ApiService.resolveUrl(
+                                    _profileUser!.avatarUrl!,
+                                  ),
                                 ),
                                 onBackgroundImageError: (exception, stackTrace) {
                                   print(
@@ -191,7 +197,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 radius: 50,
                                 backgroundColor: Colors.blue.shade100,
                                 child: Text(
-                                  widget.user.displayName[0].toUpperCase(),
+                                  (_profileUser?.displayName ?? 'U')[0]
+                                      .toUpperCase(),
                                   style: const TextStyle(
                                     fontSize: 32,
                                     fontWeight: FontWeight.bold,
@@ -202,7 +209,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         const SizedBox(height: 16),
                         // Name and username
                         Text(
-                          widget.user.displayName,
+                          _profileUser?.displayName ?? '',
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -210,7 +217,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '@${widget.user.username}',
+                          '@${_profileUser?.username}',
                           style: const TextStyle(
                             fontSize: 16,
                             color: Colors.grey,
@@ -221,9 +228,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Text(
-                            (widget.user.bio != null &&
-                                    widget.user.bio!.isNotEmpty)
-                                ? widget.user.bio!
+                            (_profileUser?.bio != null &&
+                                    _profileUser!.bio!.isNotEmpty)
+                                ? _profileUser!.bio!
                                 : 'No bio yet',
                             textAlign: TextAlign.center,
                             style: TextStyle(
@@ -248,7 +255,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'Joined ${DateFormat('MMMM yyyy').format(widget.user.createdAt)}',
+                              _profileUser != null
+                                  ? 'Joined ${DateFormat('MMMM yyyy').format(_profileUser!.createdAt)}'
+                                  : '',
                               style: const TextStyle(color: Colors.grey),
                             ),
                           ],
@@ -287,19 +296,25 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         const SizedBox(height: 16),
                         // Owner actions: Edit profile, New post
                         if (_currentUser != null &&
-                            _currentUser!.id == widget.user.id)
+                            _profileUser != null &&
+                            _currentUser!.id == _profileUser!.id)
                           Row(
                             children: [
                               Expanded(
                                 child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Edit profile coming soon',
-                                        ),
-                                      ),
-                                    );
+                                  onPressed: () async {
+                                    final updated = await Navigator.of(context)
+                                        .push<User>(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                UserProfileEditScreen(
+                                                  user: _currentUser!,
+                                                ),
+                                          ),
+                                        );
+                                    if (updated != null) {
+                                      await _refresh();
+                                    }
                                   },
                                   icon: const Icon(Icons.edit_outlined),
                                   label: const Text('Edit Profile'),
@@ -339,7 +354,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         const SizedBox(height: 8),
                         // Follow button
                         if (_currentUser != null &&
-                            _currentUser!.id != widget.user.id)
+                            _profileUser != null &&
+                            _currentUser!.id != _profileUser!.id)
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(

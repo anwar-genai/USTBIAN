@@ -475,4 +475,30 @@ class ApiService {
       throw Exception('Failed to get user');
     }
   }
+
+  // Update user profile (displayName, bio, avatarUrl optional)
+  static Future<User> updateUser(
+    String userId, {
+    String? displayName,
+    String? bio,
+    String? avatarUrl,
+  }) async {
+    final body = <String, dynamic>{};
+    if (displayName != null) body['displayName'] = displayName;
+    if (bio != null) body['bio'] = bio;
+    if (avatarUrl != null) body['avatarUrl'] = avatarUrl;
+
+    final response = await http.patch(
+      Uri.parse('$baseUrl/users/$userId'),
+      headers: await _getHeaders(),
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200) {
+      return User.fromJson(jsonDecode(response.body));
+    }
+    throw Exception(
+      'Failed to update profile: ${response.statusCode} ${response.body}',
+    );
+  }
 }
