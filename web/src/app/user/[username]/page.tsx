@@ -28,10 +28,46 @@ export default function UserProfilePage() {
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [followLoading, setFollowLoading] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
 
   useEffect(() => {
     loadUserProfile();
+    loadCurrentUserData();
   }, [username]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      
+      if (showNotifications && !target.closest('.notifications-dropdown') && !target.closest('.notifications-bell')) {
+        setShowNotifications(false);
+      }
+      
+      if (showProfileMenu && !target.closest('.profile-dropdown') && !target.closest('.profile-menu-trigger')) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNotifications, showProfileMenu]);
+
+  // Keyboard: close on Escape
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showNotifications) setShowNotifications(false);
+        if (showProfileMenu) setShowProfileMenu(false);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showNotifications, showProfileMenu]);
 
   const loadUserProfile = async () => {
     try {
@@ -77,6 +113,59 @@ export default function UserProfilePage() {
     }
   };
 
+  const loadCurrentUserData = async () => {
+    try {
+      const token = getToken();
+      if (!token) return;
+
+      const [meData, userData, notificationsData] = await Promise.all([
+        api.getMe(token),
+        api.getUserById(token, meData.userId),
+        api.getNotifications(token).catch(() => []),
+      ]);
+
+      setCurrentUser(userData);
+      setNotifications(notificationsData);
+    } catch (err) {
+      console.error('Failed to load current user data', err);
+    }
+  };
+
+  const handleNotificationClick = async (notification: any) => {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      await api.markNotificationAsRead(token, notification.id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
+      );
+
+      if (notification.type === 'follow' && notification.metadata?.followerUsername) {
+        router.push(`/user/${notification.metadata.followerUsername}`);
+      } else if (notification.metadata?.postId) {
+        router.push(`/post/${notification.metadata.postId}`);
+      }
+    } catch (err) {
+      console.error('Failed to mark notification as read', err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    const token = getToken();
+    if (!token) return;
+
+    setMarkingAllRead(true);
+    try {
+      await api.markAllNotificationsAsRead(token);
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch (err) {
+      console.error('Failed to mark all as read', err);
+    } finally {
+      setMarkingAllRead(false);
+    }
+  };
+
   const handleFollowToggle = async () => {
     if (!user) return;
     const token = getToken();
@@ -117,26 +206,154 @@ export default function UserProfilePage() {
 
   const isOwnProfile = currentUserId === user.id;
 
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/feed" className="text-2xl font-bold text-gray-900 hover:text-blue-600 transition">
             Ustbian
           </Link>
           <div className="flex items-center gap-4">
-            {!isOwnProfile && (
-              <Link href="/profile" className="text-sm text-gray-600 hover:text-gray-900 font-medium">
-                My Profile
-              </Link>
-            )}
-            <button
-              onClick={handleLogout}
-              className="text-sm text-gray-600 hover:text-gray-900 font-medium"
-            >
-              Logout
-            </button>
+            {/* Notifications */}
+            <div className="relative">
+              <button
+                aria-haspopup="menu"
+                aria-expanded={showNotifications}
+                onClick={() => {
+                  setShowNotifications((v) => !v);
+                  setShowProfileMenu(false);
+                }}
+                className="relative p-2 text-gray-600 hover:text-gray-900 transition notifications-bell focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                  />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <div
+                  role="menu"
+                  tabIndex={-1}
+                  className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-y-auto notifications-dropdown focus:outline-none"
+                >
+                  <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900">Notifications</h3>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={handleMarkAllAsRead}
+                        disabled={markingAllRead}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
+                      >
+                        {markingAllRead ? 'Marking...' : 'Mark all read'}
+                      </button>
+                    )}
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">No notifications</div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {notifications.map((notif) => (
+                        <button
+                          key={notif.id}
+                          role="menuitem"
+                          onClick={() => handleNotificationClick(notif)}
+                          className={`w-full text-left p-3 hover:bg-gray-50 cursor-pointer transition ${!notif.read ? 'bg-blue-50' : ''}`}
+                        >
+                          <p className="text-sm text-gray-800">{notif.message || notif.type}</p>
+                          <p className="text-xs text-gray-500 mt-1">{new Date(notif.createdAt).toLocaleString()}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Profile Menu */}
+            <div className="relative">
+              <button
+                aria-haspopup="menu"
+                aria-expanded={showProfileMenu}
+                onClick={() => {
+                  setShowProfileMenu((v) => !v);
+                  setShowNotifications(false);
+                }}
+                className="profile-menu-trigger focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
+              >
+                {currentUser?.avatarUrl ? (
+                  <img
+                    src={currentUser.avatarUrl}
+                    alt={currentUser.displayName}
+                    className="w-9 h-9 rounded-full object-cover border border-gray-300 hover:border-blue-500 transition"
+                  />
+                ) : (
+                  <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold hover:bg-blue-700 transition">
+                    {currentUser?.displayName?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                )}
+              </button>
+
+              {showProfileMenu && (
+                <div
+                  role="menu"
+                  tabIndex={-1}
+                  className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 profile-dropdown focus:outline-none"
+                >
+                  <div className="p-3 border-b border-gray-200 flex items-center gap-3">
+                    {currentUser?.avatarUrl ? (
+                      <img src={currentUser.avatarUrl} alt="avatar" className="w-6 h-6 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                        {currentUser?.displayName?.[0]?.toUpperCase() || 'U'}
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-semibold text-gray-900 leading-4">{currentUser?.displayName}</p>
+                      <p className="text-xs text-gray-600">@{currentUser?.username}</p>
+                    </div>
+                  </div>
+                  <div className="py-1">
+                    <Link
+                      href="/profile"
+                      role="menuitem"
+                      className="block px-3 py-2 text-gray-700 hover:bg-gray-50 transition"
+                    >
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        View Profile
+                      </div>
+                    </Link>
+                    <button
+                      role="menuitem"
+                      onClick={handleLogout}
+                      className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 transition"
+                    >
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Logout
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
