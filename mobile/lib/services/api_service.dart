@@ -440,24 +440,50 @@ class ApiService {
 
   // Follow system
   static Future<void> followUser(String userId) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/users/$userId/follow'),
-      headers: await _getHeaders(),
-    );
+    try {
+      print('Following user: $userId');
+      final response = await http.post(
+        Uri.parse('$baseUrl/users/$userId/follow'),
+        headers: await _getHeaders(),
+      );
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to follow user');
+      print('Follow response status: ${response.statusCode}');
+      print('Follow response body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('Successfully followed user');
+      } else {
+        throw Exception(
+          'Failed to follow user: ${response.statusCode} ${response.body}',
+        );
+      }
+    } catch (e) {
+      print('Follow error: $e');
+      rethrow;
     }
   }
 
   static Future<void> unfollowUser(String userId) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl/users/$userId/follow'),
-      headers: await _getHeaders(),
-    );
+    try {
+      print('Unfollowing user: $userId');
+      final response = await http.delete(
+        Uri.parse('$baseUrl/users/$userId/follow'),
+        headers: await _getHeaders(),
+      );
 
-    if (response.statusCode != 200) {
-      throw Exception('Failed to unfollow user');
+      print('Unfollow response status: ${response.statusCode}');
+      print('Unfollow response body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print('Successfully unfollowed user');
+      } else {
+        throw Exception(
+          'Failed to unfollow user: ${response.statusCode} ${response.body}',
+        );
+      }
+    } catch (e) {
+      print('Unfollow error: $e');
+      rethrow;
     }
   }
 

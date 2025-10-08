@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getToken, clearToken } from '@/lib/auth';
 import Link from 'next/link';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface User {
   id: string;
@@ -164,17 +165,39 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/feed" className="text-2xl font-bold text-gray-900 hover:text-blue-600 transition">
             Ustbian
           </Link>
-          <button
-            onClick={handleLogout}
-            className="text-sm text-gray-600 hover:text-gray-900 font-medium"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-4">
+            {/* Search Icon */}
+            <Link
+              href="/feed"
+              className="p-2 text-gray-600 hover:text-gray-900 transition focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full"
+              aria-label="Search"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </Link>
+
+            {/* Notifications */}
+            <NotificationBell />
+
+            {/* Profile/Logout */}
+            <button
+              onClick={handleLogout}
+              className="text-sm text-gray-600 hover:text-gray-900 font-medium px-3 py-2 rounded-lg hover:bg-gray-100 transition"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 

@@ -175,23 +175,63 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Future<void> _toggleFollow() async {
     if (_currentUser == null) return;
 
-    setState(() => _isLoading = true);
+    // Store the original state for potential rollback
+    final originalFollowingState = _isFollowing;
+    final originalFollowersCount = _followersCount;
+
+    // Optimistically update UI first
+    setState(() {
+      _isLoading = true;
+      _isFollowing = !_isFollowing;
+      _followersCount += _isFollowing ? 1 : -1;
+    });
 
     try {
-      if (_isFollowing) {
+      if (originalFollowingState) {
         await ApiService.unfollowUser(widget.user.id);
-        setState(() {
-          _isFollowing = false;
-          _followersCount--;
-        });
       } else {
         await ApiService.followUser(widget.user.id);
-        setState(() {
-          _isFollowing = true;
-          _followersCount++;
-        });
+      }
+
+      // Success - show confirmation message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  _isFollowing
+                      ? Icons.person_add_rounded
+                      : Icons.person_remove_rounded,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _isFollowing
+                        ? 'Successfully followed!'
+                        : 'Successfully unfollowed!',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
+      // Rollback the optimistic update on error
+      setState(() {
+        _isFollowing = originalFollowingState;
+        _followersCount = originalFollowersCount;
+      });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -201,7 +241,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Failed to ${_isFollowing ? 'unfollow' : 'follow'} user: $e',
+                    'Failed to ${originalFollowingState ? 'unfollow' : 'follow'} user. Please try again.',
                   ),
                 ),
               ],

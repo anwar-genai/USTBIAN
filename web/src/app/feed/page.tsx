@@ -44,6 +44,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getToken, clearToken } from '@/lib/auth';
 import { getSocket } from '@/lib/socket';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface Post {
   id: string;
@@ -71,15 +72,12 @@ interface Notification {
 export default function FeedPage() {
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [newPost, setNewPost] = useState('');
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [markingAllRead, setMarkingAllRead] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, any[]>>({});
@@ -142,7 +140,6 @@ export default function FeedPage() {
     }
     return out;
   };
-  const notifMenuRef = useRef<HTMLDivElement | null>(null);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const profileTriggerRef = useRef<HTMLButtonElement | null>(null);
   const commentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -170,10 +167,9 @@ export default function FeedPage() {
       const token = getToken();
       if (!token) return;
 
-      const [postsData, meData, notificationsData, likesData] = await Promise.all([
+      const [postsData, meData, likesData] = await Promise.all([
         api.getPosts(token),
         api.getMe(token),
-        api.getNotifications(token).catch(() => []),
         api.getMyLikes(token).catch(() => ({ likedPostIds: [] })),
       ]);
 
@@ -183,7 +179,6 @@ export default function FeedPage() {
       setPosts(postsData);
       setCurrentUserId(meData.userId);
       setCurrentUser(userData);
-      setNotifications(notificationsData);
       setLikedPosts(new Set(likesData.likedPostIds));
     } catch (err) {
       console.error('Failed to load data', err);
@@ -195,14 +190,15 @@ export default function FeedPage() {
   const setupRealtimeListeners = async () => {
     const socket = getSocket();
     
-    // Remove any existing listeners first to prevent duplicates
-    socket.removeAllListeners();
-
     const token = getToken();
     if (token) {
       try {
         const me = await api.getMe(token);
         const myUserId = me.userId as string;
+
+        // Remove existing post like listeners to prevent duplicates
+        socket.off('post.like.added');
+        socket.off('post.like.removed');
 
         socket.on('post.like.added', (data: { postId: string; userId: string }) => {
           if (data.userId === myUserId) return;
@@ -213,38 +209,6 @@ export default function FeedPage() {
           if (data.userId === myUserId) return;
           setPosts((prev) => prev.map((p) => (p.id === data.postId ? { ...p, likesCount: Math.max((p.likesCount || 1) - 1, 0) } : p)));
         });
-      } catch {}
-    }
-
-    if (token) {
-      try {
-        const me = await api.getMe(token);
-        
-        // Listen for new notifications (prevent duplicates by checking if already exists)
-        socket.on(`notification.${me.userId}`, (notification: Notification) => {
-          console.log('New notification received:', notification);
-          setNotifications((prev) => {
-            // Check if notification already exists to prevent duplicates
-            if (prev.some((n) => n.id === notification.id)) {
-              return prev;
-            }
-            return [notification, ...prev];
-          });
-        });
-
-        // Listen for deleted notifications
-        socket.on(`notification.deleted.${me.userId}`, (data: any) => {
-          console.log('Notification deletion event received:', data);
-          const notifId = data?.notificationId || data?.id;
-          if (notifId) {
-            console.log('Deleting notification with ID:', notifId);
-            setNotifications((prev) => prev.filter((n) => n.id !== notifId));
-          } else {
-            console.error('No notificationId found in deletion event:', data);
-          }
-        });
-        
-        setCurrentUserId(me.userId);
       } catch (err) {
         console.error('Failed to setup realtime listeners', err);
       }
@@ -433,42 +397,6 @@ export default function FeedPage() {
     router.push('/login');
   };
 
-  const handleNotificationClick = async (notification: any) => {
-    const token = getToken();
-    if (!token) return;
-
-    try {
-      // Mark as read
-      await api.markNotificationAsRead(token, notification.id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n))
-      );
-
-      // Navigate based on notification type
-      if (notification.type === 'follow' && notification.metadata?.followerUsername) {
-        router.push(`/user/${notification.metadata.followerUsername}`);
-      } else if (notification.metadata?.postId) {
-        router.push(`/post/${notification.metadata.postId}`);
-      }
-    } catch (err) {
-      console.error('Failed to mark notification as read', err);
-    }
-  };
-
-  const handleMarkAllAsRead = async () => {
-    const token = getToken();
-    if (!token) return;
-
-    setMarkingAllRead(true);
-    try {
-      await api.markAllNotificationsAsRead(token);
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    } catch (err) {
-      console.error('Failed to mark all as read', err);
-    } finally {
-      setMarkingAllRead(false);
-    }
-  };
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
@@ -503,10 +431,6 @@ export default function FeedPage() {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       
-      if (showNotifications && !target.closest('.notifications-dropdown') && !target.closest('.notifications-bell')) {
-        setShowNotifications(false);
-      }
-      
       if (showProfileMenu && !target.closest('.profile-dropdown') && !target.closest('.profile-menu-trigger')) {
         setShowProfileMenu(false);
       }
@@ -514,13 +438,12 @@ export default function FeedPage() {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showNotifications, showProfileMenu]);
+  }, [showProfileMenu]);
 
   // Keyboard: close on Escape and focus management
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showNotifications) setShowNotifications(false);
         if (showProfileMenu) {
           setShowProfileMenu(false);
           // return focus to trigger
@@ -530,12 +453,8 @@ export default function FeedPage() {
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [showNotifications, showProfileMenu]);
+  }, [showProfileMenu]);
 
-  // Move focus into dropdowns when they open (basic a11y)
-  useEffect(() => {
-    if (showNotifications) notifMenuRef.current?.focus();
-  }, [showNotifications]);
   useEffect(() => {
     if (showProfileMenu) profileMenuRef.current?.focus();
   }, [showProfileMenu]);
@@ -608,8 +527,6 @@ export default function FeedPage() {
       </div>
     );
   }
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -684,71 +601,8 @@ export default function FeedPage() {
               )}
             </div>
 
-            {/* Notifications (anchored) */}
-            <div className="relative">
-              <button
-                aria-haspopup="menu"
-                aria-expanded={showNotifications}
-                onClick={() => {
-                  setShowNotifications((v) => !v);
-                  setShowProfileMenu(false);
-                }}
-                className="relative p-2 text-gray-600 hover:text-gray-900 transition notifications-bell focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                  />
-                </svg>
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {showNotifications && (
-                <div
-                  ref={notifMenuRef}
-                  role="menu"
-                  tabIndex={-1}
-                  className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-y-auto notifications-dropdown focus:outline-none"
-                >
-                  <div className="p-3 border-b border-gray-200 flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">Notifications</h3>
-                    {unreadCount > 0 && (
-                      <button
-                        onClick={handleMarkAllAsRead}
-                        disabled={markingAllRead}
-                        className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
-                      >
-                        {markingAllRead ? 'Marking...' : 'Mark all read'}
-                      </button>
-                    )}
-                  </div>
-                  {notifications.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">No notifications</div>
-                  ) : (
-                    <div className="divide-y divide-gray-100">
-                      {notifications.map((notif) => (
-                        <button
-                          key={notif.id}
-                          role="menuitem"
-                          onClick={() => handleNotificationClick(notif)}
-                          className={`w-full text-left p-3 hover:bg-gray-50 cursor-pointer transition ${!notif.read ? 'bg-blue-50' : ''}`}
-                        >
-                          <p className="text-sm text-gray-800">{notif.message || notif.type}</p>
-                          <p className="text-xs text-gray-500 mt-1">{new Date(notif.createdAt).toLocaleString()}</p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* Notifications */}
+            <NotificationBell />
 
             {/* Profile (anchored) */}
             <div className="relative">
@@ -758,7 +612,6 @@ export default function FeedPage() {
                 aria-expanded={showProfileMenu}
                 onClick={() => {
                   setShowProfileMenu((v) => !v);
-                  setShowNotifications(false);
                 }}
                 className="profile-menu-trigger focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
               >
