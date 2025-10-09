@@ -361,12 +361,15 @@ export default function FeedPage() {
       setToastType('success');
       setShowToast(true);
       
-      // Highlight the new post with animation
-      setNewPostId(createdPost.id);
-      setTimeout(() => setNewPostId(null), 3000);
-      
-      // Smooth scroll to top to show new post
+      // Smooth scroll to top first (before adding post for better animation)
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      // Wait a bit for scroll to start, then show new post with animation
+      setTimeout(() => {
+        // Highlight the new post with animation
+        setNewPostId(createdPost.id);
+        setTimeout(() => setNewPostId(null), 4000); // 4 seconds highlight
+      }, 200);
     } catch (err) {
       console.error('Failed to create post', err);
       
@@ -666,8 +669,8 @@ export default function FeedPage() {
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Create Post */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6 relative">
-          <form onSubmit={handleCreatePost}>
+        <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow p-5 mb-6 relative border border-gray-100">
+          <form onSubmit={handleCreatePost} className="space-y-3">
             <textarea
               ref={newPostTextareaRef}
               value={newPost}
@@ -686,7 +689,7 @@ export default function FeedPage() {
                 }
               }}
               placeholder="What's on your mind? Use @ to mention someone"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all"
               rows={3}
               maxLength={500}
             />
@@ -699,37 +702,39 @@ export default function FeedPage() {
               onClose={closeNewPostMentionAutocomplete}
             />
             
-            <AIToolbar
-              onGenerate={() => {
-                setIsEditMode(false);
-                setShowAIPrompt(true);
-              }}
-              onEnhance={(tone) => {
-                setIsEditMode(false);
-                handleAIEnhance(tone);
-              }}
-              onShorten={() => {
-                setIsEditMode(false);
-                handleAIShorten();
-              }}
-              disabled={aiLoading}
-              hasText={newPost.trim().length > 0}
-            />
-            
-            <div className="mt-3 flex justify-between items-center">
-              <span className={`text-sm ${newPost.length > 450 ? 'text-orange-600 font-semibold' : 'text-gray-500'}`}>
-                {newPost.length}/500
-              </span>
-              <button
-                type="submit"
-                disabled={posting || !newPost.trim() || aiLoading}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition flex items-center gap-2"
-              >
-                {posting && (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                )}
-                {posting ? 'Creating...' : aiLoading ? 'AI Processing...' : 'Post'}
-              </button>
+            <div className="flex items-center justify-between">
+              <AIToolbar
+                onGenerate={() => {
+                  setIsEditMode(false);
+                  setShowAIPrompt(true);
+                }}
+                onEnhance={(tone) => {
+                  setIsEditMode(false);
+                  handleAIEnhance(tone);
+                }}
+                onShorten={() => {
+                  setIsEditMode(false);
+                  handleAIShorten();
+                }}
+                disabled={aiLoading}
+                hasText={newPost.trim().length > 0}
+              />
+              
+              <div className="flex items-center gap-3">
+                <span className={`text-xs font-semibold ${newPost.length > 450 ? 'text-orange-600' : newPost.length > 0 ? 'text-gray-600' : 'text-gray-400'}`}>
+                  {newPost.length}/500
+                </span>
+                <button
+                  type="submit"
+                  disabled={posting || !newPost.trim() || aiLoading}
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all cursor-pointer flex items-center gap-2"
+                >
+                  {posting && (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  )}
+                  {posting ? 'Creating...' : aiLoading ? 'AI Processing...' : 'Post'}
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -744,8 +749,10 @@ export default function FeedPage() {
             posts.map((post) => (
               <div 
                 key={post.id} 
-                className={`bg-white rounded-lg shadow p-6 transition-all duration-300 ${
-                  post.id === newPostId ? 'animate-slideDown animate-highlightPulse ring-2 ring-blue-400 shadow-lg' : ''
+                className={`bg-white rounded-lg shadow p-6 transition-all duration-500 ${
+                  post.id === newPostId 
+                    ? 'animate-slideDown animate-highlightPulse ring-4 ring-blue-400/50 shadow-2xl shadow-blue-200/50' 
+                    : 'hover:shadow-md'
                 }`}
               >
                 <div className="flex items-start gap-3">
