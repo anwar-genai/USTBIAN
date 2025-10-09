@@ -138,5 +138,66 @@ export class NotificationsService {
 
     return { success: true, deleted: notifications.length };
   }
+
+  async deleteMentionNotification(recipientId: string, actorId: string, postId: string) {
+    const notifications = await this.notificationsRepository.find({
+      where: {
+        recipient: { id: recipientId },
+        actor: { id: actorId },
+        type: NotificationType.MENTION,
+      },
+    });
+
+    const toDelete = notifications.filter((n) => n.metadata?.postId === postId);
+
+    if (toDelete.length > 0) {
+      console.log(`Deleting ${toDelete.length} mention notification(s) for post ${postId}`);
+
+      const idsToDelete = toDelete.map((n) => n.id);
+      await this.notificationsRepository.remove(toDelete);
+
+      idsToDelete.forEach((id) => {
+        console.log(`Emitting deletion for mention notification ID: ${id}`);
+        this.realtime.emitNotificationDeleted(recipientId, id);
+      });
+    }
+
+    return { success: true, deleted: toDelete.length };
+  }
+
+  async deleteAllMentionNotificationsForPost(postId: string) {
+    const notifications = await this.notificationsRepository.find({
+      where: {
+        type: NotificationType.MENTION,
+      },
+    });
+
+    const toDelete = notifications.filter((n) => n.metadata?.postId === postId);
+
+    if (toDelete.length > 0) {
+      console.log(`Deleting ${toDelete.length} mention notification(s) for deleted post ${postId}`);
+
+      // Group by recipient for efficient real-time updates
+      const byRecipient = new Map<string, string[]>();
+      toDelete.forEach((n) => {
+        const recipientId = n.recipient.id;
+        if (!byRecipient.has(recipientId)) {
+          byRecipient.set(recipientId, []);
+        }
+        byRecipient.get(recipientId)!.push(n.id);
+      });
+
+      await this.notificationsRepository.remove(toDelete);
+
+      // Emit deletion events
+      byRecipient.forEach((notificationIds, recipientId) => {
+        notificationIds.forEach((id) => {
+          this.realtime.emitNotificationDeleted(recipientId, id);
+        });
+      });
+    }
+
+    return { success: true, deleted: toDelete.length };
+  }
 }
 

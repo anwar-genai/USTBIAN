@@ -48,6 +48,7 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { AIToolbar } from '@/components/AIToolbar';
 import { AIPromptDialog } from '@/components/AIPromptDialog';
 import { AIGenerateDialog } from '@/components/AIGenerateDialog';
+import { parseMultilineText } from '@/utils/text-parser';
 
 interface Post {
   id: string;
@@ -944,11 +945,11 @@ export default function FeedPage() {
                       </div>
                     ) : (
                       <div className="mt-2">
-                        <p className="text-gray-800 whitespace-pre-wrap">
+                        <div className="text-gray-800">
                           {expandedPosts.has(post.id) || !shouldTruncatePost(post.content)
-                            ? post.content
-                            : getTruncatedPost(post.content)}
-                        </p>
+                            ? parseMultilineText(post.content)
+                            : parseMultilineText(getTruncatedPost(post.content))}
+                        </div>
                         {shouldTruncatePost(post.content) && (
                           <button
                             onClick={() =>
@@ -1062,7 +1063,7 @@ export default function FeedPage() {
                                   <span className="text-sm font-semibold text-gray-900">{c.author?.displayName || 'User'}</span>
                                   <span className="text-xs text-gray-500">{formatDate(c.createdAt)}</span>
                                 </div>
-                                <p className="text-gray-800 text-sm mt-1 whitespace-pre-wrap break-words">{c.content}</p>
+                                <div className="text-gray-800 text-sm mt-1 break-words">{parseMultilineText(c.content)}</div>
                                 <div className="mt-1 flex items-center gap-3">
                                   <button
                                     onClick={() => {
