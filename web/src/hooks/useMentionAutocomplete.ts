@@ -16,6 +16,11 @@ export function useMentionAutocomplete(textareaRef: React.RefObject<HTMLTextArea
   });
 
   const detectMention = useCallback((text: string, cursorPos: number) => {
+    // Quick check: if no @ in text, skip expensive operations
+    if (!text.includes('@')) {
+      return { shouldShow: false, query: '', startPos: 0 };
+    }
+
     // Find the @ symbol before the cursor
     const textBeforeCursor = text.substring(0, cursorPos);
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
@@ -48,13 +53,21 @@ export function useMentionAutocomplete(textareaRef: React.RefObject<HTMLTextArea
   }, []);
 
   const handleTextChange = useCallback((text: string, cursorPos: number) => {
-    const { shouldShow, query, startPos } = detectMention(text, cursorPos);
+    // Quick exit if no @ symbol - avoid unnecessary processing
+    if (!text.includes('@')) {
+      setMentionState((prev) => {
+        if (prev.show) {
+          return { ...prev, show: false };
+        }
+        return prev;
+      });
+      return;
+    }
 
-    console.log('Mention detection:', { shouldShow, query, startPos, cursorPos, text });
+    const { shouldShow, query, startPos } = detectMention(text, cursorPos);
 
     if (shouldShow && textareaRef.current) {
       const position = calculatePosition(textareaRef.current, cursorPos);
-      console.log('Setting mention state:', { show: true, query, position });
       setMentionState({
         show: true,
         query,
@@ -62,7 +75,12 @@ export function useMentionAutocomplete(textareaRef: React.RefObject<HTMLTextArea
         cursorPosition: startPos,
       });
     } else {
-      setMentionState((prev) => ({ ...prev, show: false }));
+      setMentionState((prev) => {
+        if (prev.show) {
+          return { ...prev, show: false };
+        }
+        return prev;
+      });
     }
   }, [detectMention, calculatePosition, textareaRef]);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
 
@@ -19,19 +19,17 @@ interface MentionAutocompleteProps {
   onClose: () => void;
 }
 
-export function MentionAutocomplete({
+const MentionAutocompleteComponent = ({
   show,
   query,
   position,
   onSelect,
   onClose,
-}: MentionAutocompleteProps) {
+}: MentionAutocompleteProps) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  console.log('MentionAutocomplete render:', { show, query, position, usersCount: users.length });
 
   useEffect(() => {
     if (!show) {
@@ -186,5 +184,18 @@ export function MentionAutocomplete({
       </div>
     </div>
   );
-}
+};
+
+// Memoize component to prevent unnecessary re-renders
+export const MentionAutocomplete = memo(MentionAutocompleteComponent, (prev, next) => {
+  // Only re-render if these props change
+  return (
+    prev.show === next.show &&
+    prev.query === next.query &&
+    prev.position.top === next.position.top &&
+    prev.position.left === next.position.left
+  );
+});
+
+MentionAutocomplete.displayName = 'MentionAutocomplete';
 

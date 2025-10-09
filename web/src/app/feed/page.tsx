@@ -811,14 +811,18 @@ export default function FeedPage() {
               ref={newPostTextareaRef}
               value={newPost}
               onChange={(e) => {
-                setNewPost(e.target.value);
-                handleNewPostTextChange(e.target.value, e.target.selectionStart);
-              }}
-              onKeyUp={(e) => {
-                handleNewPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+                const target = e.target;
+                setNewPost(target.value);
+                // Use requestAnimationFrame to avoid blocking the input
+                requestAnimationFrame(() => {
+                  handleNewPostTextChange(target.value, target.selectionStart);
+                });
               }}
               onClick={(e) => {
-                handleNewPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+                // Only check on click to update position if dropdown is already showing
+                if (newPostMentionState.show) {
+                  handleNewPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+                }
               }}
               placeholder="What's on your mind? Use @ to mention someone"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
@@ -935,14 +939,18 @@ export default function FeedPage() {
                           ref={editPostTextareaRef}
                           value={editPostContent}
                           onChange={(e) => {
-                            setEditPostContent(e.target.value);
-                            handleEditPostTextChange(e.target.value, e.target.selectionStart);
-                          }}
-                          onKeyUp={(e) => {
-                            handleEditPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+                            const target = e.target;
+                            setEditPostContent(target.value);
+                            // Use requestAnimationFrame to avoid blocking the input
+                            requestAnimationFrame(() => {
+                              handleEditPostTextChange(target.value, target.selectionStart);
+                            });
                           }}
                           onClick={(e) => {
-                            handleEditPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+                            // Only check on click to update position if dropdown is already showing
+                            if (editPostMentionState.show) {
+                              handleEditPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+                            }
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                           rows={3}
