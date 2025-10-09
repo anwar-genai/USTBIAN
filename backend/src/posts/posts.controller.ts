@@ -33,8 +33,13 @@ export class PostsController {
 
   @Get()
   @ApiOperation({ summary: 'List recent posts (includes commentsCount)' })
-  async list() {
-    const posts = await this.postsService.listRecent();
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of posts to return' })
+  @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Number of posts to skip' })
+  async list(@Query('limit') limit?: string, @Query('offset') offset?: string) {
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    const offsetNum = offset ? parseInt(offset, 10) : 0;
+    
+    const posts = await this.postsService.listRecent(limitNum, offsetNum);
     const withCounts = await Promise.all(
       posts.map(async (p) => ({
         ...p,

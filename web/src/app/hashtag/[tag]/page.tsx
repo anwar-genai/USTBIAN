@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
 import { parseMultilineText } from '@/utils/text-parser';
 import { AppHeader } from '@/components/AppHeader';
 import { getSocket } from '@/lib/socket';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 
 interface Post {
   id: string;
@@ -36,6 +37,26 @@ export default function HashtagPage() {
   const [newComment, setNewComment] = useState<Record<string, string>>({});
   const [replyTo, setReplyTo] = useState<Record<string, any | null>>({});
   const commentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const offsetRef = useRef(0);
+
+  const dedupeById = (items: any[]) => {
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const it of items) {
+      const id = it?.id;
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push(it);
+    }
+    return out;
+  };
+
+  const dedupePosts = (existingPosts: Post[], newPosts: Post[]): Post[] => {
+    const allPosts = [...existingPosts, ...newPosts];
+    return dedupeById(allPosts);
+  };
 
   useEffect(() => {
     loadData();
@@ -48,7 +69,7 @@ export default function HashtagPage() {
     };
   }, [tag]);
 
-  const loadData = async () => {
+  const loadData = async (isInitial = true) => {
     try {
       const token = getToken();
       if (!token) {
@@ -56,21 +77,57 @@ export default function HashtagPage() {
         return;
       }
 
-      const [postsData, meData, likesData] = await Promise.all([
+      if (!isInitial) {
+        setLoadingMore(true);
+      }
+
+      // Note: Hashtag search doesn't support pagination yet, so we load all
+      // For now, we'll simulate it by loading all and then slicing
+      const [allPostsData, meData, likesData] = await Promise.all([
         api.searchByHashtag(tag),
-        api.getMe(token),
-        api.getMyLikes(token).catch(() => ({ likedPostIds: [] })),
+        isInitial ? api.getMe(token) : Promise.resolve({ userId: currentUserId }),
+        isInitial ? api.getMyLikes(token).catch(() => ({ likedPostIds: [] })) : Promise.resolve({ likedPostIds: Array.from(likedPosts) }),
       ]);
 
-      setPosts(postsData);
-      setCurrentUserId(meData.userId);
-      setLikedPosts(new Set(likesData.likedPostIds));
+      if (isInitial) {
+        // Initial load - show first 20
+        setPosts(allPostsData.slice(0, 20));
+        setCurrentUserId(meData.userId);
+        setLikedPosts(new Set(likesData.likedPostIds));
+        offsetRef.current = 20;
+        setHasMore(allPostsData.length > 20);
+        
+        // Store all posts in a ref for pagination simulation
+        (window as any).__allHashtagPosts = allPostsData;
+      } else {
+        // Load more from stored posts (with deduplication)
+        const allPosts = (window as any).__allHashtagPosts || [];
+        const nextBatch = allPosts.slice(offsetRef.current, offsetRef.current + 20);
+        setPosts((prev) => dedupePosts(prev, nextBatch));
+        offsetRef.current = offsetRef.current + 20;
+        setHasMore(offsetRef.current < allPosts.length);
+      }
     } catch (error) {
       console.error('Failed to load posts:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasMore) {
+      loadData(false);
+    }
+  }, [loadingMore, hasMore]);
+
+  // Infinite scroll hook
+  useInfiniteScroll({
+    onLoadMore: loadMore,
+    hasMore,
+    loading: loadingMore,
+    threshold: 500,
+  });
 
   const setupRealtimeListeners = async () => {
     const socket = getSocket();
@@ -479,6 +536,25 @@ export default function HashtagPage() {
                 </div>
               </div>
             ))}
+
+            {/* Infinite Scroll Loading Indicator */}
+            {loadingMore && (
+              <div className="bg-white rounded-xl shadow p-6 text-center">
+                <div className="inline-block w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                <p className="mt-3 text-gray-600 font-medium">Loading more posts...</p>
+              </div>
+            )}
+
+            {/* End of Posts Message */}
+            {!hasMore && posts.length > 0 && (
+              <div className="bg-white rounded-xl shadow p-6 text-center">
+                <svg className="w-12 h-12 text-purple-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-gray-500 font-medium">You've seen all posts with #{tag}!</p>
+                <p className="text-sm text-gray-400 mt-1">Check back later for more</p>
+              </div>
+            )}
           </div>
         )}
       </div>

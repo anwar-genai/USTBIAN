@@ -42,9 +42,9 @@ export const api = {
     return res.json();
   },
 
-  async getPosts(token?: string) {
+  async getPosts(token?: string, limit = 20, offset = 0) {
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    const res = await fetch(`${API_URL}/posts`, { headers });
+    const res = await fetch(`${API_URL}/posts?limit=${limit}&offset=${offset}`, { headers });
     if (!res.ok) throw new Error('Failed to fetch posts');
     return res.json();
   },

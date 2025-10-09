@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 // Rolling counter animation (old value slides up, new value slides in)
 function RollingCounter({ value }: { value: number }) {
   const prevRef = useRef<number>(value);
@@ -52,6 +52,7 @@ import { MentionAutocomplete } from '@/components/MentionAutocomplete';
 import { AppHeader } from '@/components/AppHeader';
 import { parseMultilineText } from '@/utils/text-parser';
 import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 
 interface Post {
   id: string;
@@ -82,6 +83,9 @@ export default function FeedPage() {
   const [newPost, setNewPost] = useState('');
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const offsetRef = useRef(0);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -149,6 +153,11 @@ export default function FeedPage() {
     }
     return out;
   };
+
+  const dedupePosts = (existingPosts: Post[], newPosts: Post[]): Post[] => {
+    const allPosts = [...existingPosts, ...newPosts];
+    return dedupeById(allPosts);
+  };
   const commentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const newPostTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const editPostTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -187,30 +196,74 @@ export default function FeedPage() {
     };
   }, [router]);
 
-  const loadData = async () => {
+  const loadData = async (isInitial = true) => {
     try {
       const token = getToken();
       if (!token) return;
 
+      if (!isInitial) {
+        setLoadingMore(true);
+      }
+
+      const currentOffset = isInitial ? 0 : offsetRef.current;
+      const limit = 20;
+
+      console.log('Loading posts:', { isInitial, currentOffset, limit });
+
       const [postsData, meData, likesData] = await Promise.all([
-        api.getPosts(token),
-        api.getMe(token),
-        api.getMyLikes(token).catch(() => ({ likedPostIds: [] })),
+        api.getPosts(token, limit, currentOffset),
+        isInitial ? api.getMe(token) : Promise.resolve({ userId: currentUserId }),
+        isInitial ? api.getMyLikes(token).catch(() => ({ likedPostIds: [] })) : Promise.resolve({ likedPostIds: Array.from(likedPosts) }),
       ]);
 
-      // Fetch full user profile
-      const userData = await api.getUserById(token, meData.userId);
+      console.log('Received posts:', { count: postsData.length, hasMore: postsData.length >= limit });
 
-      setPosts(postsData);
-      setCurrentUserId(meData.userId);
-      setCurrentUser(userData);
-      setLikedPosts(new Set(likesData.likedPostIds));
+      if (isInitial) {
+        // Initial load (with deduplication in case of real-time updates)
+        const userData = await api.getUserById(token, meData.userId);
+        setPosts((prev) => prev.length > 0 ? dedupePosts(prev, postsData) : postsData);
+        setCurrentUserId(meData.userId);
+        setCurrentUser(userData);
+        setLikedPosts(new Set(likesData.likedPostIds));
+        offsetRef.current = limit;
+        // Only set hasMore to false if we got fewer posts than requested
+        setHasMore(postsData.length >= limit);
+        console.log('Initial load complete:', { postsCount: postsData.length, offset: offsetRef.current, hasMore: postsData.length >= limit });
+      } else {
+        // Load more (append to existing posts with deduplication)
+        const beforeCount = posts.length;
+        setPosts((prev) => {
+          const deduped = dedupePosts(prev, postsData);
+          console.log('After dedupe:', { before: beforeCount, after: deduped.length, added: deduped.length - beforeCount });
+          return deduped;
+        });
+        offsetRef.current = offsetRef.current + limit;
+        // Set hasMore based on whether we got a full batch
+        setHasMore(postsData.length >= limit);
+        console.log('Load more complete:', { postsCount: postsData.length, offset: offsetRef.current, hasMore: postsData.length >= limit });
+      }
     } catch (err) {
       console.error('Failed to load data', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasMore) {
+      console.log('Loading more posts, current offset:', offsetRef.current);
+      loadData(false);
+    }
+  }, [loadingMore, hasMore]);
+
+  // Infinite scroll hook
+  useInfiniteScroll({
+    onLoadMore: loadMore,
+    hasMore,
+    loading: loadingMore,
+    threshold: 500,
+  });
 
   const setupRealtimeListeners = async () => {
     const socket = getSocket();
@@ -286,7 +339,10 @@ export default function FeedPage() {
     try {
       await api.createPost(token, cleanedContent);
       setNewPost('');
-      await loadData();
+      // Reset and reload from beginning
+      offsetRef.current = 0;
+      setHasMore(true);
+      await loadData(true);
     } catch (err) {
       console.error('Failed to create post', err);
       alert('Failed to create post. Please try again.');
@@ -957,6 +1013,25 @@ export default function FeedPage() {
                 </div>
               </div>
             ))
+          )}
+
+          {/* Infinite Scroll Loading Indicator */}
+          {loadingMore && (
+            <div className="bg-white rounded-lg shadow p-6 text-center">
+              <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              <p className="mt-3 text-gray-600 font-medium">Loading more posts...</p>
+            </div>
+          )}
+
+          {/* End of Posts Message */}
+          {!hasMore && posts.length > 0 && (
+            <div className="bg-white rounded-lg shadow p-6 text-center">
+              <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-gray-500 font-medium">You've reached the end!</p>
+              <p className="text-sm text-gray-400 mt-1">No more posts to show</p>
+            </div>
           )}
         </div>
       </div>

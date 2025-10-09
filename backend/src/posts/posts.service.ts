@@ -70,8 +70,12 @@ export class PostsService {
     return post;
   }
 
-  async listRecent(limit = 20): Promise<PostEntity[]> {
-    return await this.postsRepository.find({ order: { createdAt: 'DESC' }, take: limit });
+  async listRecent(limit = 20, offset = 0): Promise<PostEntity[]> {
+    return await this.postsRepository.find({ 
+      order: { createdAt: 'DESC' }, 
+      take: limit,
+      skip: offset,
+    });
   }
 
   async searchByHashtag(hashtag: string, limit = 50): Promise<PostEntity[]> {
