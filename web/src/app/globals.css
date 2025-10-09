@@ -98,6 +98,44 @@ body {
   }
 }
 
+@keyframes typewriter {
+  0%, 50% {
+    width: 0;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes cursorPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scaleY(0.8);
+  }
+}
+
+@keyframes placeholderGlow {
+  0%, 100% {
+    text-shadow: 0 0 5px rgba(59, 130, 246, 0.2);
+  }
+  50% {
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+  }
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.2s ease-out;
 }
@@ -120,4 +158,134 @@ body {
 
 .animate-ringPulse {
   animation: ringPulse 1.5s ease-out infinite;
+}
+
+.animate-typewriter {
+  animation: typewriter 2s ease-in-out;
+}
+
+.animate-blink {
+  animation: blink 1s infinite;
+}
+
+.animate-cursorPulse {
+  animation: cursorPulse 1.2s ease-in-out infinite;
+}
+
+.animate-placeholderGlow {
+  animation: placeholderGlow 2s ease-in-out infinite;
+}
+
+/* Beautiful cursor styling */
+.beautiful-cursor {
+  caret-color: #3b82f6;
+  cursor: text;
+  caret-shape: bar;
+}
+
+.beautiful-cursor::selection {
+  background-color: rgba(59, 130, 246, 0.2);
+}
+
+.beautiful-cursor:focus {
+  caret-color: #1d4ed8;
+  caret-width: 2px;
+}
+
+.beautiful-cursor-focused {
+  caret-color: #1d4ed8;
+  caret-width: 3px;
+  caret-shape: bar;
+}
+
+/* Industry-standard responsive input styles */
+@media (max-width: 640px) {
+  .beautiful-cursor {
+    font-size: 16px; /* Prevents zoom on iOS */
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+/* Touch-friendly interactions */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.beautiful-cursor.touch-manipulation {
+  user-select: text; /* Allow text selection in input */
+}
+
+/* Focus management for better UX */
+.focus-scroll {
+  scroll-margin-top: 2rem;
+  scroll-margin-bottom: 2rem;
+}
+
+/* Industry-standard form enhancements */
+.form-enhanced {
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: inherit;
+}
+
+.form-enhanced:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+/* Responsive text sizing */
+@media (max-width: 480px) {
+  .responsive-text {
+    font-size: 14px;
+    line-height: 1.4;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .responsive-text {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+}
+
+@media (min-width: 769px) {
+  .responsive-text {
+    font-size: 16px;
+    line-height: 1.6;
+  }
+}
+
+/* Fixed height input styling */
+.fixed-height-input {
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
+}
+
+.fixed-height-input textarea {
+  vertical-align: middle !important;
+  line-height: 1.2 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Clean professional input styling */
+.professional-input {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.professional-input:focus-within {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
 }

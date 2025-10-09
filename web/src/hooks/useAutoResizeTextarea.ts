@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 export function useAutoResizeTextarea(
   textareaRef: React.RefObject<HTMLTextAreaElement>,
   value: string,
-  minHeight = 40,  // Minimum height in pixels (single line)
+  minHeight = 48,  // Minimum height in pixels (single line)
   maxHeight = 200, // Maximum height in pixels
 ) {
   useEffect(() => {

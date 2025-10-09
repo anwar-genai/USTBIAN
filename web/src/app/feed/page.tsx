@@ -54,7 +54,7 @@ import { Toast } from '@/components/Toast';
 import { parseMultilineText } from '@/utils/text-parser';
 import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
-import { useAutoResizeTextarea } from '@/hooks/useAutoResizeTextarea';
+import { useResponsiveInput } from '@/hooks/useResponsiveInput';
 
 interface Post {
   id: string;
@@ -90,6 +90,9 @@ export default function FeedPage() {
   const offsetRef = useRef(0);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Responsive input hook
+  const { isMobile, getResponsivePadding, getResponsiveMaxHeight, getResponsivePlaceholderPosition } = useResponsiveInput();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, any[]>>({});
@@ -184,8 +187,7 @@ export default function FeedPage() {
     closeMentionAutocomplete: closeEditPostMentionAutocomplete,
   } = useMentionAutocomplete(editPostTextareaRef);
 
-  // Auto-resize textarea (40px for single line with padding)
-  useAutoResizeTextarea(newPostTextareaRef, newPost, 40, 200);
+  // Fixed height textarea - no auto-resize for better UX
 
   useEffect(() => {
     const token = getToken();
@@ -671,41 +673,102 @@ export default function FeedPage() {
     <div className="min-h-screen bg-gray-50">
       <AppHeader />
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         {/* Create Post */}
-        <div className="bg-gradient-to-br from-blue-50/50 via-white to-purple-50/30 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 mb-6 relative border border-blue-100/50 backdrop-blur-sm">
+        <div className="bg-gradient-to-br from-blue-50/50 via-white to-purple-50/30 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-4 sm:p-6 mb-6 relative border border-blue-100/50 backdrop-blur-sm">
           <form onSubmit={handleCreatePost} className="space-y-3">
-            <div className="relative flex items-center">
-              <textarea
-                ref={newPostTextareaRef}
-                value={newPost}
-                onChange={(e) => {
-                  const target = e.target;
-                  setNewPost(target.value);
-                  // Use requestAnimationFrame to avoid blocking the input
-                  requestAnimationFrame(() => {
-                    handleNewPostTextChange(target.value, target.selectionStart);
-                  });
-                }}
-                onClick={(e) => {
-                  // Only check on click to update position if dropdown is already showing
-                  if (newPostMentionState.show) {
-                    handleNewPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
-                  }
-                }}
-                placeholder="💭 Share your thoughts..."
-                className="w-full px-5 py-2 border border-gray-300/50 rounded-full focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 resize-none transition-all duration-300 bg-white/80 backdrop-blur-sm focus:bg-white shadow-sm focus:shadow-md placeholder:text-gray-400/70 leading-relaxed"
-                style={{ 
-                  minHeight: '40px',
-                  maxHeight: '200px',
-                  lineHeight: '1.6',
-                  paddingTop: '8px',
-                  paddingBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
-                maxLength={500}
-              />
+            <div className="relative flex items-center group">
+              <div className="relative w-full professional-input">
+                <textarea
+                  ref={newPostTextareaRef}
+                  value={newPost}
+                  onChange={(e) => {
+                    const target = e.target;
+                    setNewPost(target.value);
+                    
+                    // Use requestAnimationFrame to avoid blocking the input
+                    requestAnimationFrame(() => {
+                      handleNewPostTextChange(target.value, target.selectionStart);
+                    });
+                  }}
+                  onClick={(e) => {
+                    // Only check on click to update position if dropdown is already showing
+                    if (newPostMentionState.show) {
+                      handleNewPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    // Industry standard keyboard shortcuts
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (newPost.trim() && !posting) {
+                        handleCreatePost(e);
+                      }
+                    }
+                    // Escape to blur
+                    if (e.key === 'Escape') {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  onFocus={() => {
+                    // Smooth focus animation
+                    requestAnimationFrame(() => {
+                      if (newPostTextareaRef.current) {
+                        newPostTextareaRef.current.scrollIntoView({ 
+                          behavior: 'smooth', 
+                          block: 'center' 
+                        });
+                      }
+                    });
+                  }}
+                  className="w-full h-12 px-5 py-3 border border-gray-300/50 focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 resize-none transition-all duration-300 bg-white/80 backdrop-blur-sm focus:bg-white shadow-sm focus:shadow-md leading-relaxed beautiful-cursor focus:beautiful-cursor-focused rounded-2xl text-base sm:text-lg touch-manipulation focus-scroll form-enhanced responsive-text"
+                  style={{ 
+                    height: '48px',
+                    minHeight: '48px',
+                    maxHeight: '48px',
+                    lineHeight: '1.5',
+                    paddingTop: '12px',
+                    paddingBottom: '12px',
+                    paddingLeft: isMobile ? '20px' : '24px',
+                    paddingRight: isMobile ? '20px' : '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    // iOS Safari fixes
+                    WebkitAppearance: 'none',
+                    WebkitBorderRadius: '16px',
+                    // Better touch targets
+                    touchAction: 'manipulation',
+                    overflow: 'hidden'
+                  }}
+                  maxLength={500}
+                  placeholder="" // Empty to avoid duplicate
+                  autoComplete="off"
+                  spellCheck="true"
+                  aria-label="Write a new post"
+                  aria-describedby="post-help-text"
+                  role="textbox"
+                  tabIndex={0}
+                />
+                
+                {/* Custom placeholder with responsive design and colorful elements */}
+                {newPost.length === 0 && (
+                  <div className={`absolute top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1.5 text-sm ${isMobile ? 'left-5' : 'left-6'}`}>
+                    <span className="text-gray-400/60 text-base">💭</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-gray-400/70 hidden sm:inline">Share your thoughts, use</span>
+                      <span className="text-gray-400/70 sm:hidden">Share, use</span>
+                      <span className="font-medium text-blue-400/50 hover:text-blue-500/60 transition-colors duration-200">@mentions</span>
+                      <span className="text-gray-400/70 hidden sm:inline">or</span>
+                      <span className="font-medium text-purple-400/50 hover:text-purple-500/60 transition-colors duration-200">#hashtags</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Help text for accessibility */}
+              <div id="post-help-text" className="sr-only">
+                Write your post. Use @ to mention someone or # for hashtags. Press Enter to post or Shift+Enter for new line.
+              </div>
             </div>
             
             <MentionAutocomplete
@@ -716,7 +779,7 @@ export default function FeedPage() {
               onClose={closeNewPostMentionAutocomplete}
             />
             
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
               <AIToolbar
                 onGenerate={() => {
                   setIsEditMode(false);
@@ -734,14 +797,14 @@ export default function FeedPage() {
                 hasText={newPost.trim().length > 0}
               />
               
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
                 <span className={`text-xs font-semibold ${newPost.length > 450 ? 'text-orange-600' : newPost.length > 0 ? 'text-gray-600' : 'text-gray-400'}`}>
                   {newPost.length}/500
                 </span>
                 <button
                   type="submit"
                   disabled={posting || !newPost.trim() || aiLoading}
-                  className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all cursor-pointer flex items-center gap-2"
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all cursor-pointer flex items-center gap-2 text-sm sm:text-base min-w-[80px] sm:min-w-[100px] justify-center"
                 >
                   {posting && (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
