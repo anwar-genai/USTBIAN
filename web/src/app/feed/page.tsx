@@ -184,8 +184,8 @@ export default function FeedPage() {
     closeMentionAutocomplete: closeEditPostMentionAutocomplete,
   } = useMentionAutocomplete(editPostTextareaRef);
 
-  // Auto-resize textarea
-  useAutoResizeTextarea(newPostTextareaRef, newPost, 56, 200);
+  // Auto-resize textarea (40px for single line with padding)
+  useAutoResizeTextarea(newPostTextareaRef, newPost, 40, 200);
 
   useEffect(() => {
     const token = getToken();
@@ -673,30 +673,40 @@ export default function FeedPage() {
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Create Post */}
-        <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow p-5 mb-6 relative border border-gray-100">
+        <div className="bg-gradient-to-br from-blue-50/50 via-white to-purple-50/30 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 mb-6 relative border border-blue-100/50 backdrop-blur-sm">
           <form onSubmit={handleCreatePost} className="space-y-3">
-            <textarea
-              ref={newPostTextareaRef}
-              value={newPost}
-              onChange={(e) => {
-                const target = e.target;
-                setNewPost(target.value);
-                // Use requestAnimationFrame to avoid blocking the input
-                requestAnimationFrame(() => {
-                  handleNewPostTextChange(target.value, target.selectionStart);
-                });
-              }}
-              onClick={(e) => {
-                // Only check on click to update position if dropdown is already showing
-                if (newPostMentionState.show) {
-                  handleNewPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
-                }
-              }}
-              placeholder="What's on your mind? Use @ to mention someone or #hashtag"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-400 resize-none transition-all duration-200 bg-gray-50 focus:bg-white placeholder-gray-400"
-              style={{ minHeight: '56px', maxHeight: '200px' }}
-              maxLength={500}
-            />
+            <div className="relative flex items-center">
+              <textarea
+                ref={newPostTextareaRef}
+                value={newPost}
+                onChange={(e) => {
+                  const target = e.target;
+                  setNewPost(target.value);
+                  // Use requestAnimationFrame to avoid blocking the input
+                  requestAnimationFrame(() => {
+                    handleNewPostTextChange(target.value, target.selectionStart);
+                  });
+                }}
+                onClick={(e) => {
+                  // Only check on click to update position if dropdown is already showing
+                  if (newPostMentionState.show) {
+                    handleNewPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+                  }
+                }}
+                placeholder="💭 Share your thoughts..."
+                className="w-full px-5 py-2 border border-gray-300/50 rounded-full focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 resize-none transition-all duration-300 bg-white/80 backdrop-blur-sm focus:bg-white shadow-sm focus:shadow-md placeholder:text-gray-400/70 leading-relaxed"
+                style={{ 
+                  minHeight: '40px',
+                  maxHeight: '200px',
+                  lineHeight: '1.6',
+                  paddingTop: '8px',
+                  paddingBottom: '8px',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+                maxLength={500}
+              />
+            </div>
             
             <MentionAutocomplete
               show={newPostMentionState.show}
