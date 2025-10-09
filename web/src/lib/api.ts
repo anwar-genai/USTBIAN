@@ -49,6 +49,12 @@ export const api = {
     return res.json();
   },
 
+  async findById(postId: string) {
+    const res = await fetch(`${API_URL}/posts/${postId}`);
+    if (!res.ok) throw new Error('Failed to fetch post');
+    return res.json();
+  },
+
   async createPost(token: string, content: string, mediaUrls?: string[]) {
     const res = await fetch(`${API_URL}/posts`, {
       method: 'POST',
