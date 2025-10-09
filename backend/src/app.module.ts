@@ -14,6 +14,7 @@ import { FollowsModule } from './follows/follows.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { CommentsModule } from './comments/comments.module';
+import { AIModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { CommentsModule } from './comments/comments.module';
     NotificationsModule,
     UploadsModule,
     CommentsModule,
+    AIModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

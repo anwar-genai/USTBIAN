@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 // Rolling counter animation (old value slides up, new value slides in)
 function RollingCounter({ value }: { value: number }) {
   const prevRef = useRef<number>(value);
@@ -45,6 +45,17 @@ import { api } from '@/lib/api';
 import { getToken, clearToken } from '@/lib/auth';
 import { getSocket } from '@/lib/socket';
 import { NotificationBell } from '@/components/NotificationBell';
+import { AIToolbar } from '@/components/AIToolbar';
+import { AIPromptDialog } from '@/components/AIPromptDialog';
+import { AIGenerateDialog } from '@/components/AIGenerateDialog';
+import { MentionAutocomplete } from '@/components/MentionAutocomplete';
+import { AppHeader } from '@/components/AppHeader';
+import { Toast } from '@/components/Toast';
+import { parseMultilineText } from '@/utils/text-parser';
+import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { useResponsiveInput } from '@/hooks/useResponsiveInput';
+import { useAutoExpandTextarea } from '@/hooks/useAutoExpandTextarea';
 
 interface Post {
   id: string;
@@ -75,10 +86,15 @@ export default function FeedPage() {
   const [newPost, setNewPost] = useState('');
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const offsetRef = useRef(0);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Responsive input hook
+  const { isMobile, getResponsivePadding, getResponsiveMaxHeight, getResponsivePlaceholderPosition } = useResponsiveInput();
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, any[]>>({});
   const [newComment, setNewComment] = useState<Record<string, string>>({});
@@ -90,11 +106,18 @@ export default function FeedPage() {
   const [editingPost, setEditingPost] = useState<string | null>(null);
   const [editPostContent, setEditPostContent] = useState<string>('');
   const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searching, setSearching] = useState(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // AI states
+  const [showAIPrompt, setShowAIPrompt] = useState(false);
+  const [showAISuggestions, setShowAISuggestions] = useState(false);
+  const [aiSuggestions, setAISuggestions] = useState<string[]>([]);
+  const [aiLoading, setAILoading] = useState(false);
+  const [aiError, setAIError] = useState<string>('');
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
+  const [newPostId, setNewPostId] = useState<string | null>(null);
 
   const formatDate = (iso: string) => {
     try {
@@ -140,9 +163,35 @@ export default function FeedPage() {
     }
     return out;
   };
-  const profileMenuRef = useRef<HTMLDivElement | null>(null);
-  const profileTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const dedupePosts = (existingPosts: Post[], newPosts: Post[]): Post[] => {
+    const allPosts = [...existingPosts, ...newPosts];
+    return dedupeById(allPosts);
+  };
   const commentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const newPostTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const editPostTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  
+  // Auto-expand textarea hook
+  useAutoExpandTextarea(newPostTextareaRef, newPost, 56, 200);
+  
+  // Mention autocomplete for new post
+  const {
+    mentionState: newPostMentionState,
+    handleTextChange: handleNewPostTextChange,
+    handleMentionSelect: handleNewPostMentionSelect,
+    closeMentionAutocomplete: closeNewPostMentionAutocomplete,
+  } = useMentionAutocomplete(newPostTextareaRef);
+
+  // Mention autocomplete for edit post
+  const {
+    mentionState: editPostMentionState,
+    handleTextChange: handleEditPostTextChange,
+    handleMentionSelect: handleEditPostMentionSelect,
+    closeMentionAutocomplete: closeEditPostMentionAutocomplete,
+  } = useMentionAutocomplete(editPostTextareaRef);
+
+  // Fixed height textarea - no auto-resize for better UX
 
   useEffect(() => {
     const token = getToken();
@@ -162,30 +211,77 @@ export default function FeedPage() {
     };
   }, [router]);
 
-  const loadData = async () => {
+  const loadData = async (isInitial = true) => {
     try {
       const token = getToken();
       if (!token) return;
 
+      if (!isInitial) {
+        setLoadingMore(true);
+      }
+
+      const currentOffset = isInitial ? 0 : offsetRef.current;
+      const limit = 20;
+
+      console.log('Loading posts:', { isInitial, currentOffset, limit });
+
       const [postsData, meData, likesData] = await Promise.all([
-        api.getPosts(token),
-        api.getMe(token),
-        api.getMyLikes(token).catch(() => ({ likedPostIds: [] })),
+        api.getPosts(token, limit, currentOffset),
+        isInitial ? api.getMe(token) : Promise.resolve({ userId: currentUserId }),
+        isInitial ? api.getMyLikes(token).catch(() => ({ likedPostIds: [] })) : Promise.resolve({ likedPostIds: Array.from(likedPosts) }),
       ]);
 
-      // Fetch full user profile
-      const userData = await api.getUserById(token, meData.userId);
+      console.log('Received posts:', { count: postsData.length, hasMore: postsData.length >= limit });
 
-      setPosts(postsData);
-      setCurrentUserId(meData.userId);
-      setCurrentUser(userData);
-      setLikedPosts(new Set(likesData.likedPostIds));
+      if (isInitial) {
+        // Initial load (with deduplication in case of real-time updates)
+        const userData = await api.getUserById(token, meData.userId);
+        setPosts((prev) => prev.length > 0 ? dedupePosts(prev, postsData) : postsData);
+        setCurrentUserId(meData.userId);
+        setCurrentUser(userData);
+        setLikedPosts(new Set(likesData.likedPostIds));
+        offsetRef.current = limit;
+        // Only set hasMore to false if we got fewer posts than requested
+        setHasMore(postsData.length >= limit);
+        console.log('Initial load complete:', { postsCount: postsData.length, offset: offsetRef.current, hasMore: postsData.length >= limit });
+      } else {
+        // Load more (append to existing posts with deduplication)
+        const beforeCount = posts.length;
+        setPosts((prev) => {
+          const deduped = dedupePosts(prev, postsData);
+          console.log('After dedupe:', { before: beforeCount, after: deduped.length, added: deduped.length - beforeCount });
+          return deduped;
+        });
+        offsetRef.current = offsetRef.current + limit;
+        // Set hasMore based on whether we got a full batch
+        setHasMore(postsData.length >= limit);
+        console.log('Load more complete:', { postsCount: postsData.length, offset: offsetRef.current, hasMore: postsData.length >= limit });
+      }
     } catch (err) {
       console.error('Failed to load data', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  const loadMore = useCallback(() => {
+    // Don't load more during initial loading
+    if (loading || loadingMore || !hasMore) {
+      console.log('Skipping loadMore:', { loading, loadingMore, hasMore, offset: offsetRef.current });
+      return;
+    }
+    console.log('Loading more posts, current offset:', offsetRef.current);
+    loadData(false);
+  }, [loading, loadingMore, hasMore]);
+
+  // Infinite scroll hook
+  useInfiniteScroll({
+    onLoadMore: loadMore,
+    hasMore,
+    loading: loading || loadingMore,  // Prevent trigger during initial load too
+    threshold: 500,
+  });
 
   const setupRealtimeListeners = async () => {
     const socket = getSocket();
@@ -258,13 +354,39 @@ export default function FeedPage() {
     if (!token) return;
 
     setPosting(true);
+    setNewPost('');
+
     try {
-      await api.createPost(token, cleanedContent);
-      setNewPost('');
-      await loadData();
+      // Make API call and wait for real post
+      const createdPost = await api.createPost(token, cleanedContent);
+      
+      // Add real post to top of feed with smooth animation
+      setPosts((prev) => [{ ...createdPost, commentsCount: 0, likesCount: 0 }, ...prev]);
+      
+      // Increment offset since we added a post
+      offsetRef.current = offsetRef.current + 1;
+      
+      // Show success toast
+      setToastMessage('Post created successfully!');
+      setToastType('success');
+      setShowToast(true);
+      
+      // Smooth scroll to top first (before adding post for better animation)
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      
+      // Wait a bit for scroll to start, then show new post with animation
+      setTimeout(() => {
+        // Highlight the new post with animation
+        setNewPostId(createdPost.id);
+        setTimeout(() => setNewPostId(null), 4000); // 4 seconds highlight
+      }, 200);
     } catch (err) {
       console.error('Failed to create post', err);
-      alert('Failed to create post. Please try again.');
+      
+      // Show error toast
+      setToastMessage('Failed to create post. Please try again.');
+      setToastType('error');
+      setShowToast(true);
     } finally {
       setPosting(false);
     }
@@ -297,6 +419,7 @@ export default function FeedPage() {
   const handleEditPost = (post: any) => {
     setEditingPost(post.id);
     setEditPostContent(post.content);
+    setIsEditMode(true);
   };
 
   const handleSavePost = async (postId: string) => {
@@ -392,83 +515,94 @@ export default function FeedPage() {
     }
   };
 
-  const handleLogout = () => {
-    clearToken();
-    router.push('/login');
+  // AI Functions
+  const handleAIGenerate = async (prompt: string) => {
+    const token = getToken();
+    if (!token) return;
+
+    setShowAIPrompt(false);
+    setShowAISuggestions(true);
+    setAILoading(true);
+    setAIError('');
+    setAISuggestions([]);
+
+    try {
+      const response = await api.generateText(token, prompt, 500);
+      if (response.error) {
+        setAIError(response.error);
+      } else {
+        setAISuggestions(response.suggestions || []);
+      }
+    } catch (err) {
+      console.error('AI generation failed:', err);
+      setAIError('Failed to generate text. Please try again.');
+    } finally {
+      setAILoading(false);
+    }
   };
 
+  const handleAIEnhance = async (tone?: 'professional' | 'casual' | 'friendly' | 'humorous') => {
+    const token = getToken();
+    if (!token) return;
 
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-    
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
+    const textToEnhance = isEditMode ? editPostContent : newPost;
+    if (!textToEnhance.trim()) return;
 
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    searchTimeoutRef.current = setTimeout(async () => {
-      const token = getToken();
-      if (!token) return;
-
-      setSearching(true);
-      try {
-        const results = await api.searchUsers(token, query);
-        setSearchResults(results);
-      } catch (err) {
-        console.error('Failed to search users', err);
-      } finally {
-        setSearching(false);
+    setAILoading(true);
+    try {
+      const response = await api.enhanceText(token, textToEnhance, tone, 500);
+      if (response.error) {
+        alert(response.error);
+      } else {
+        if (isEditMode) {
+          setEditPostContent(response.enhanced);
+        } else {
+          setNewPost(response.enhanced);
+        }
       }
-    }, 300);
+    } catch (err) {
+      console.error('AI enhancement failed:', err);
+      alert('Failed to enhance text. Please try again.');
+    } finally {
+      setAILoading(false);
+    }
   };
 
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      
-      if (showProfileMenu && !target.closest('.profile-dropdown') && !target.closest('.profile-menu-trigger')) {
-        setShowProfileMenu(false);
-      }
+  const handleAIShorten = async () => {
+    const token = getToken();
+    if (!token) return;
 
-      if (showSearch && !target.closest('.search-dropdown') && !target.closest('.search-button')) {
-        setShowSearch(false);
-        setSearchQuery('');
-        setSearchResults([]);
-      }
-    };
+    const textToShorten = isEditMode ? editPostContent : newPost;
+    if (!textToShorten.trim()) return;
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showProfileMenu, showSearch]);
-
-  // Keyboard: close on Escape and focus management
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (showProfileMenu) {
-          setShowProfileMenu(false);
-          // return focus to trigger
-          profileTriggerRef.current?.focus();
-        }
-        if (showSearch) {
-          setShowSearch(false);
-          setSearchQuery('');
-          setSearchResults([]);
+    setAILoading(true);
+    try {
+      const response = await api.shortenText(token, textToShorten, 500);
+      if (response.error) {
+        alert(response.error);
+      } else {
+        if (isEditMode) {
+          setEditPostContent(response.shortened);
+        } else {
+          setNewPost(response.shortened);
         }
       }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [showProfileMenu, showSearch]);
+    } catch (err) {
+      console.error('AI shortening failed:', err);
+      alert('Failed to shorten text. Please try again.');
+    } finally {
+      setAILoading(false);
+    }
+  };
 
-  useEffect(() => {
-    if (showProfileMenu) profileMenuRef.current?.focus();
-  }, [showProfileMenu]);
+  const handleSelectAISuggestion = (text: string) => {
+    if (isEditMode) {
+      setEditPostContent(text);
+    } else {
+      setNewPost(text);
+    }
+  };
+
   // Realtime comments listeners
   useEffect(() => {
     if (!expandedPostId) return;
@@ -541,179 +675,144 @@ export default function FeedPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Ustbian</h1>
-          <div className="flex items-center gap-4">
-            {/* Search (anchored) */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setShowSearch((v) => !v);
-                  setShowNotifications(false);
-                  setShowProfileMenu(false);
-                }}
-                className="search-button p-2 text-gray-600 hover:text-gray-900 transition focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
-                title="Search users"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
+      <AppHeader />
 
-              {showSearch && (
-                <div className="search-dropdown absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-y-auto focus:outline-none">
-                  <div className="p-3 border-b border-gray-200">
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => handleSearch(e.target.value)}
-                      placeholder="Search users..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      autoFocus
-                    />
-                  </div>
-                  {searching ? (
-                    <div className="p-4 text-center text-gray-500">Searching...</div>
-                  ) : searchResults.length === 0 && searchQuery.trim() ? (
-                    <div className="p-4 text-center text-gray-500">No users found</div>
-                  ) : searchResults.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">Type to search users</div>
-                  ) : (
-                    <div className="divide-y divide-gray-100">
-                      {searchResults.map((user: any) => (
-                        <a
-                          key={user.id}
-                          href={`/user/${user.username}`}
-                          className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition"
-                          onClick={() => {
-                            setShowSearch(false);
-                            setSearchQuery('');
-                            setSearchResults([]);
-                          }}
-                        >
-                          {user.avatarUrl ? (
-                            <img src={user.avatarUrl} alt={user.displayName} className="w-10 h-10 rounded-full object-cover" />
-                          ) : (
-                            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-                              {user.displayName[0].toUpperCase()}
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 truncate">{user.displayName}</p>
-                            <p className="text-sm text-gray-600 truncate">@{user.username}</p>
-                          </div>
-                        </a>
-                      ))}
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        {/* Create Post */}
+        <div className="bg-gradient-to-br from-blue-50/50 via-white to-purple-50/30 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-4 sm:p-6 mb-6 relative border border-blue-100/50 backdrop-blur-sm">
+          <form onSubmit={handleCreatePost} className="space-y-3">
+            <div className="relative flex items-center group">
+              <div className="relative w-full professional-input">
+                <textarea
+                  ref={newPostTextareaRef}
+                  value={newPost}
+                  onChange={(e) => {
+                    const target = e.target;
+                    setNewPost(target.value);
+                    
+                    // Direct call for faster typing response
+                    handleNewPostTextChange(target.value, target.selectionStart);
+                  }}
+                  onClick={(e) => {
+                    // Only check on click to update position if dropdown is already showing
+                    if (newPostMentionState.show) {
+                      handleNewPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    // Industry standard keyboard shortcuts
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (newPost.trim() && !posting) {
+                        handleCreatePost(e);
+                      }
+                    }
+                    // Escape to blur
+                    if (e.key === 'Escape') {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  onFocus={() => {
+                    // Smooth focus animation
+                    requestAnimationFrame(() => {
+                      if (newPostTextareaRef.current) {
+                        newPostTextareaRef.current.scrollIntoView({ 
+                          behavior: 'smooth', 
+                          block: 'center' 
+                        });
+                      }
+                    });
+                  }}
+                  className="w-full px-5 py-3 border border-gray-300/50 focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 resize-none transition-all duration-300 bg-white/80 backdrop-blur-sm focus:bg-white shadow-sm focus:shadow-md leading-relaxed beautiful-cursor focus:beautiful-cursor-focused rounded-2xl text-base sm:text-lg touch-manipulation focus-scroll form-enhanced responsive-text auto-expand-textarea"
+                  style={{ 
+                    minHeight: '56px',
+                    maxHeight: '200px',
+                    lineHeight: '1.5',
+                    paddingTop: '14px',
+                    paddingBottom: '14px',
+                    paddingLeft: isMobile ? '20px' : '24px',
+                    paddingRight: isMobile ? '20px' : '24px',
+                    // iOS Safari fixes
+                    WebkitAppearance: 'none',
+                    WebkitBorderRadius: '16px',
+                    // Better touch targets
+                    touchAction: 'manipulation',
+                    overflow: 'hidden',
+                    // Smooth height transitions
+                    transition: 'height 0.2s ease-out, box-shadow 0.3s ease, transform 0.3s ease'
+                  }}
+                  maxLength={500}
+                  placeholder="" // Empty to avoid duplicate
+                  autoComplete="off"
+                  spellCheck="true"
+                  aria-label="Write a new post"
+                  aria-describedby="post-help-text"
+                  role="textbox"
+                  tabIndex={0}
+                />
+                
+                {/* Custom placeholder with responsive design and colorful elements */}
+                {newPost.length === 0 && (
+                  <div className={`absolute top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1.5 text-sm ${isMobile ? 'left-5' : 'left-6'}`}>
+                    <span className="text-gray-400/60 text-base">💭</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-gray-400/70 hidden sm:inline">Share your thoughts, use</span>
+                      <span className="text-gray-400/70 sm:hidden">Share, use</span>
+                      <span className="font-medium text-blue-400/50 hover:text-blue-500/60 transition-colors duration-200">@mentions</span>
+                      <span className="text-gray-400/70 hidden sm:inline">or</span>
+                      <span className="font-medium text-purple-400/50 hover:text-purple-500/60 transition-colors duration-200">#hashtags</span>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Notifications */}
-            <NotificationBell />
-
-            {/* Profile (anchored) */}
-            <div className="relative">
-              <button
-                ref={profileTriggerRef}
-                aria-haspopup="menu"
-                aria-expanded={showProfileMenu}
-                onClick={() => {
-                  setShowProfileMenu((v) => !v);
-                }}
-                className="profile-menu-trigger focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
-              >
-                {currentUser?.avatarUrl ? (
-                  <img
-                    src={currentUser.avatarUrl}
-                    alt={currentUser.displayName}
-                    className="w-9 h-9 rounded-full object-cover border border-gray-300 hover:border-blue-500 transition"
-                  />
-                ) : (
-                  <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold hover:bg-blue-700 transition">
-                    {currentUser?.displayName?.[0]?.toUpperCase() || 'U'}
                   </div>
                 )}
-              </button>
-
-              {showProfileMenu && (
-                <div
-                  ref={profileMenuRef}
-                  role="menu"
-                  tabIndex={-1}
-                  className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 profile-dropdown focus:outline-none"
-                >
-                  <div className="p-3 border-b border-gray-200 flex items-center gap-3">
-                    {currentUser?.avatarUrl ? (
-                      <img src={currentUser.avatarUrl} alt="avatar" className="w-6 h-6 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-                        {currentUser?.displayName?.[0]?.toUpperCase() || 'U'}
-                      </div>
-                    )}
-                    <div>
-                      <p className="font-semibold text-gray-900 leading-4">{currentUser?.displayName}</p>
-                      <p className="text-xs text-gray-600">@{currentUser?.username}</p>
-                    </div>
-                  </div>
-                  <div className="py-1">
-                    <a
-                      href="/profile"
-                      role="menuitem"
-                      className="block px-3 py-2 text-gray-700 hover:bg-gray-50 transition"
-                    >
-                      <div className="flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        View Profile
-                      </div>
-                    </a>
-                    <button
-                      role="menuitem"
-                      onClick={handleLogout}
-                      className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 transition"
-                    >
-                      <div className="flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Logout
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
+              </div>
+              
+              {/* Help text for accessibility */}
+              <div id="post-help-text" className="sr-only">
+                Write your post. Use @ to mention someone or # for hashtags. Press Enter to post or Shift+Enter for new line.
+              </div>
             </div>
-          </div>
-        </div>
-      
-      </header>
-
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Create Post */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <form onSubmit={handleCreatePost}>
-            <textarea
-              value={newPost}
-              onChange={(e) => setNewPost(e.target.value)}
-              placeholder="What's on your mind?"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              rows={3}
-              maxLength={500}
+            
+            <MentionAutocomplete
+              show={newPostMentionState.show}
+              query={newPostMentionState.query}
+              position={newPostMentionState.position}
+              onSelect={(username) => handleNewPostMentionSelect(username, newPost, setNewPost)}
+              onClose={closeNewPostMentionAutocomplete}
             />
-            <div className="mt-3 flex justify-between items-center">
-              <span className="text-sm text-gray-500">{newPost.length}/500</span>
-              <button
-                type="submit"
-                disabled={posting || !newPost.trim()}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition"
-              >
-                {posting ? 'Posting...' : 'Post'}
-              </button>
+            
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+              <AIToolbar
+                onGenerate={() => {
+                  setIsEditMode(false);
+                  setShowAIPrompt(true);
+                }}
+                onEnhance={(tone) => {
+                  setIsEditMode(false);
+                  handleAIEnhance(tone);
+                }}
+                onShorten={() => {
+                  setIsEditMode(false);
+                  handleAIShorten();
+                }}
+                disabled={aiLoading}
+                hasText={newPost.trim().length > 0}
+              />
+              
+              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                <span className={`text-xs font-semibold ${newPost.length > 450 ? 'text-orange-600' : newPost.length > 0 ? 'text-gray-600' : 'text-gray-400'}`}>
+                  {newPost.length}/500
+                </span>
+                <button
+                  type="submit"
+                  disabled={posting || !newPost.trim() || aiLoading}
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-all cursor-pointer flex items-center gap-2 text-sm sm:text-base min-w-[80px] sm:min-w-[100px] justify-center"
+                >
+                  {posting && (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  )}
+                  {posting ? 'Creating...' : aiLoading ? 'AI Processing...' : 'Post'}
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -726,7 +825,14 @@ export default function FeedPage() {
             </div>
           ) : (
             posts.map((post) => (
-              <div key={post.id} className="bg-white rounded-lg shadow p-6">
+              <div 
+                key={post.id} 
+                className={`bg-white rounded-lg shadow p-6 transition-all duration-500 ${
+                  post.id === newPostId 
+                    ? 'animate-slideDown animate-highlightPulse ring-4 ring-blue-400/50 shadow-2xl shadow-blue-200/50' 
+                    : 'hover:shadow-md'
+                }`}
+              >
                 <div className="flex items-start gap-3">
                   <a href={`/user/${post.author.username}`} className="flex-shrink-0 cursor-pointer">
                     {post.author.avatarUrl ? (
@@ -782,40 +888,86 @@ export default function FeedPage() {
                       )}
                     </div>
                     {editingPost === post.id ? (
-                      <div className="mt-2 space-y-2">
+                      <div className="mt-2 space-y-2 relative">
                         <textarea
+                          ref={editPostTextareaRef}
                           value={editPostContent}
-                          onChange={(e) => setEditPostContent(e.target.value)}
+                          onChange={(e) => {
+                            const target = e.target;
+                            setEditPostContent(target.value);
+                            // Use requestAnimationFrame to avoid blocking the input
+                            requestAnimationFrame(() => {
+                              handleEditPostTextChange(target.value, target.selectionStart);
+                            });
+                          }}
+                          onClick={(e) => {
+                            // Only check on click to update position if dropdown is already showing
+                            if (editPostMentionState.show) {
+                              handleEditPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+                            }
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                           rows={3}
                           maxLength={500}
                         />
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleSavePost(post.id)}
-                            disabled={!editPostContent.trim()}
-                            className="px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEditingPost(null);
-                              setEditPostContent('');
-                            }}
-                            className="px-4 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer text-sm font-medium"
-                          >
-                            Cancel
-                          </button>
+                        
+                        <MentionAutocomplete
+                          show={editPostMentionState.show}
+                          query={editPostMentionState.query}
+                          position={editPostMentionState.position}
+                          onSelect={(username) => handleEditPostMentionSelect(username, editPostContent, setEditPostContent)}
+                          onClose={closeEditPostMentionAutocomplete}
+                        />
+                        
+                        <AIToolbar
+                          onGenerate={() => {
+                            setIsEditMode(true);
+                            setShowAIPrompt(true);
+                          }}
+                          onEnhance={(tone) => {
+                            setIsEditMode(true);
+                            handleAIEnhance(tone);
+                          }}
+                          onShorten={() => {
+                            setIsEditMode(true);
+                            handleAIShorten();
+                          }}
+                          disabled={aiLoading}
+                          hasText={editPostContent.trim().length > 0}
+                        />
+                        
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs ${editPostContent.length > 450 ? 'text-orange-600 font-semibold' : 'text-gray-500'}`}>
+                            {editPostContent.length}/500
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleSavePost(post.id)}
+                              disabled={!editPostContent.trim() || aiLoading}
+                              className="px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                            >
+                              {aiLoading ? 'AI Processing...' : 'Save'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingPost(null);
+                                setEditPostContent('');
+                                setIsEditMode(false);
+                              }}
+                              className="px-4 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer text-sm font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ) : (
                       <div className="mt-2">
-                        <p className="text-gray-800 whitespace-pre-wrap">
+                        <div className="text-gray-800">
                           {expandedPosts.has(post.id) || !shouldTruncatePost(post.content)
-                            ? post.content
-                            : getTruncatedPost(post.content)}
-                        </p>
+                            ? parseMultilineText(post.content)
+                            : parseMultilineText(getTruncatedPost(post.content))}
+                        </div>
                         {shouldTruncatePost(post.content) && (
                           <button
                             onClick={() =>
@@ -929,7 +1081,7 @@ export default function FeedPage() {
                                   <span className="text-sm font-semibold text-gray-900">{c.author?.displayName || 'User'}</span>
                                   <span className="text-xs text-gray-500">{formatDate(c.createdAt)}</span>
                                 </div>
-                                <p className="text-gray-800 text-sm mt-1 whitespace-pre-wrap break-words">{c.content}</p>
+                                <div className="text-gray-800 text-sm mt-1 break-words">{parseMultilineText(c.content)}</div>
                                 <div className="mt-1 flex items-center gap-3">
                                   <button
                                     onClick={() => {
@@ -982,6 +1134,25 @@ export default function FeedPage() {
                 </div>
               </div>
             ))
+          )}
+
+          {/* Infinite Scroll Loading Indicator */}
+          {loadingMore && (
+            <div className="bg-white rounded-lg shadow p-6 text-center">
+              <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              <p className="mt-3 text-gray-600 font-medium">Loading more posts...</p>
+            </div>
+          )}
+
+          {/* End of Posts Message */}
+          {!hasMore && posts.length > 0 && (
+            <div className="bg-white rounded-lg shadow p-6 text-center">
+              <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-gray-500 font-medium">You've reached the end!</p>
+              <p className="text-sm text-gray-400 mt-1">No more posts to show</p>
+            </div>
           )}
         </div>
       </div>
@@ -1050,6 +1221,36 @@ export default function FeedPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* AI Prompt Dialog */}
+      <AIPromptDialog
+        isOpen={showAIPrompt}
+        onClose={() => setShowAIPrompt(false)}
+        onGenerate={handleAIGenerate}
+      />
+
+      {/* AI Suggestions Dialog */}
+      <AIGenerateDialog
+        isOpen={showAISuggestions}
+        onClose={() => {
+          setShowAISuggestions(false);
+          setAISuggestions([]);
+          setAIError('');
+        }}
+        onSelect={handleSelectAISuggestion}
+        suggestions={aiSuggestions}
+        loading={aiLoading}
+        error={aiError}
+      />
+
+      {/* Success/Error Toast */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setShowToast(false)}
+        />
       )}
     </div>
   );
