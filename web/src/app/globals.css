@@ -289,3 +289,20 @@ body {
   transform: translateY(-1px);
   box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
 }
+
+/* Auto-expand textarea styling */
+.auto-expand-textarea {
+  height: 56px;
+  transition: height 0.2s ease-out, box-shadow 0.3s ease, transform 0.3s ease;
+  overflow: hidden;
+}
+
+.auto-expand-textarea:focus {
+  outline: none;
+}
+
+/* Smooth height transitions for auto-expand */
+.auto-expand-textarea {
+  resize: none;
+  box-sizing: border-box;
+}

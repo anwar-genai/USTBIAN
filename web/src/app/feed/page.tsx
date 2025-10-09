@@ -55,6 +55,7 @@ import { parseMultilineText } from '@/utils/text-parser';
 import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { useResponsiveInput } from '@/hooks/useResponsiveInput';
+import { useAutoExpandTextarea } from '@/hooks/useAutoExpandTextarea';
 
 interface Post {
   id: string;
@@ -170,6 +171,9 @@ export default function FeedPage() {
   const commentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const newPostTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const editPostTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  
+  // Auto-expand textarea hook
+  useAutoExpandTextarea(newPostTextareaRef, newPost, 56, 200);
   
   // Mention autocomplete for new post
   const {
@@ -686,10 +690,8 @@ export default function FeedPage() {
                     const target = e.target;
                     setNewPost(target.value);
                     
-                    // Use requestAnimationFrame to avoid blocking the input
-                    requestAnimationFrame(() => {
-                      handleNewPostTextChange(target.value, target.selectionStart);
-                    });
+                    // Direct call for faster typing response
+                    handleNewPostTextChange(target.value, target.selectionStart);
                   }}
                   onClick={(e) => {
                     // Only check on click to update position if dropdown is already showing
@@ -721,24 +723,23 @@ export default function FeedPage() {
                       }
                     });
                   }}
-                  className="w-full h-12 px-5 py-3 border border-gray-300/50 focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 resize-none transition-all duration-300 bg-white/80 backdrop-blur-sm focus:bg-white shadow-sm focus:shadow-md leading-relaxed beautiful-cursor focus:beautiful-cursor-focused rounded-2xl text-base sm:text-lg touch-manipulation focus-scroll form-enhanced responsive-text"
+                  className="w-full px-5 py-3 border border-gray-300/50 focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400/50 resize-none transition-all duration-300 bg-white/80 backdrop-blur-sm focus:bg-white shadow-sm focus:shadow-md leading-relaxed beautiful-cursor focus:beautiful-cursor-focused rounded-2xl text-base sm:text-lg touch-manipulation focus-scroll form-enhanced responsive-text auto-expand-textarea"
                   style={{ 
-                    height: '48px',
-                    minHeight: '48px',
-                    maxHeight: '48px',
+                    minHeight: '56px',
+                    maxHeight: '200px',
                     lineHeight: '1.5',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingTop: '14px',
+                    paddingBottom: '14px',
                     paddingLeft: isMobile ? '20px' : '24px',
                     paddingRight: isMobile ? '20px' : '24px',
-                    display: 'flex',
-                    alignItems: 'center',
                     // iOS Safari fixes
                     WebkitAppearance: 'none',
                     WebkitBorderRadius: '16px',
                     // Better touch targets
                     touchAction: 'manipulation',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    // Smooth height transitions
+                    transition: 'height 0.2s ease-out, box-shadow 0.3s ease, transform 0.3s ease'
                   }}
                   maxLength={500}
                   placeholder="" // Empty to avoid duplicate

@@ -33,7 +33,7 @@ export function AIToolbar({ onGenerate, onEnhance, onShorten, disabled = false, 
           type="button"
           onClick={onGenerate}
           disabled={disabled}
-          className="group relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg hover:from-purple-100 hover:to-pink-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
+          className="group relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg hover:from-purple-100 hover:to-pink-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all shadow-sm hover:shadow-md"
           title="Generate post from prompt"
         >
           <div className="relative">
@@ -57,7 +57,7 @@ export function AIToolbar({ onGenerate, onEnhance, onShorten, disabled = false, 
             type="button"
             onClick={() => setShowToneMenu(!showToneMenu)}
             disabled={disabled || !hasText}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg hover:from-blue-100 hover:to-cyan-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg hover:from-blue-100 hover:to-cyan-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all shadow-sm hover:shadow-md"
             title="Enhance with different tones"
           >
             <svg className="w-3.5 h-3.5 transition-transform hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -74,7 +74,7 @@ export function AIToolbar({ onGenerate, onEnhance, onShorten, disabled = false, 
                   onEnhance();
                   setShowToneMenu(false);
                 }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition"
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
               >
                 ✨ Auto
               </button>
@@ -84,7 +84,7 @@ export function AIToolbar({ onGenerate, onEnhance, onShorten, disabled = false, 
                   onEnhance('professional');
                   setShowToneMenu(false);
                 }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition"
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
               >
                 💼 Professional
               </button>
@@ -94,7 +94,7 @@ export function AIToolbar({ onGenerate, onEnhance, onShorten, disabled = false, 
                   onEnhance('casual');
                   setShowToneMenu(false);
                 }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition"
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
               >
                 😎 Casual
               </button>
@@ -104,7 +104,7 @@ export function AIToolbar({ onGenerate, onEnhance, onShorten, disabled = false, 
                   onEnhance('friendly');
                   setShowToneMenu(false);
                 }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition"
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
               >
                 🤗 Friendly
               </button>
@@ -114,7 +114,7 @@ export function AIToolbar({ onGenerate, onEnhance, onShorten, disabled = false, 
                   onEnhance('humorous');
                   setShowToneMenu(false);
                 }}
-                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition"
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
               >
                 😄 Humorous
               </button>
@@ -126,7 +126,7 @@ export function AIToolbar({ onGenerate, onEnhance, onShorten, disabled = false, 
           type="button"
           onClick={onShorten}
           disabled={disabled || !hasText}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-700 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg hover:from-orange-100 hover:to-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-orange-700 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg hover:from-orange-100 hover:to-amber-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all shadow-sm hover:shadow-md"
           title="Shorten text to fit limit"
         >
           <svg className="w-3.5 h-3.5 transition-transform hover:scale-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
