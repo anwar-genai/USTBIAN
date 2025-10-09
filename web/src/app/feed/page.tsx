@@ -54,6 +54,7 @@ import { Toast } from '@/components/Toast';
 import { parseMultilineText } from '@/utils/text-parser';
 import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { useAutoResizeTextarea } from '@/hooks/useAutoResizeTextarea';
 
 interface Post {
   id: string;
@@ -182,6 +183,9 @@ export default function FeedPage() {
     handleMentionSelect: handleEditPostMentionSelect,
     closeMentionAutocomplete: closeEditPostMentionAutocomplete,
   } = useMentionAutocomplete(editPostTextareaRef);
+
+  // Auto-resize textarea
+  useAutoResizeTextarea(newPostTextareaRef, newPost, 56, 200);
 
   useEffect(() => {
     const token = getToken();
@@ -688,9 +692,9 @@ export default function FeedPage() {
                   handleNewPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
                 }
               }}
-              placeholder="What's on your mind? Use @ to mention someone"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all"
-              rows={3}
+              placeholder="What's on your mind? Use @ to mention someone or #hashtag"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-400 resize-none transition-all duration-200 bg-gray-50 focus:bg-white placeholder-gray-400"
+              style={{ minHeight: '56px', maxHeight: '200px' }}
               maxLength={500}
             />
             
