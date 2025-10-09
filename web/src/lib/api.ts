@@ -242,5 +242,54 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch following');
     return res.json();
   },
+
+  // AI Features
+  async generateText(token: string, prompt: string, maxLength?: number) {
+    const res = await fetch(`${API_URL}/ai/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ prompt, maxLength }),
+    });
+    if (!res.ok) throw new Error('Failed to generate text');
+    return res.json();
+  },
+
+  async enhanceText(token: string, text: string, tone?: 'professional' | 'casual' | 'friendly' | 'humorous', maxLength?: number) {
+    const res = await fetch(`${API_URL}/ai/enhance`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ text, tone, maxLength }),
+    });
+    if (!res.ok) throw new Error('Failed to enhance text');
+    return res.json();
+  },
+
+  async shortenText(token: string, text: string, targetLength: number) {
+    const res = await fetch(`${API_URL}/ai/shorten`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ text, targetLength }),
+    });
+    if (!res.ok) throw new Error('Failed to shorten text');
+    return res.json();
+  },
+
+  async checkAIStatus(token: string) {
+    const res = await fetch(`${API_URL}/ai/status`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to check AI status');
+    return res.json();
+  },
 };
 

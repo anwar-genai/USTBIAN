@@ -45,6 +45,9 @@ import { api } from '@/lib/api';
 import { getToken, clearToken } from '@/lib/auth';
 import { getSocket } from '@/lib/socket';
 import { NotificationBell } from '@/components/NotificationBell';
+import { AIToolbar } from '@/components/AIToolbar';
+import { AIPromptDialog } from '@/components/AIPromptDialog';
+import { AIGenerateDialog } from '@/components/AIGenerateDialog';
 
 interface Post {
   id: string;
@@ -95,6 +98,14 @@ export default function FeedPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // AI states
+  const [showAIPrompt, setShowAIPrompt] = useState(false);
+  const [showAISuggestions, setShowAISuggestions] = useState(false);
+  const [aiSuggestions, setAISuggestions] = useState<string[]>([]);
+  const [aiLoading, setAILoading] = useState(false);
+  const [aiError, setAIError] = useState<string>('');
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const formatDate = (iso: string) => {
     try {
@@ -297,6 +308,7 @@ export default function FeedPage() {
   const handleEditPost = (post: any) => {
     setEditingPost(post.id);
     setEditPostContent(post.content);
+    setIsEditMode(true);
   };
 
   const handleSavePost = async (postId: string) => {
@@ -424,6 +436,94 @@ export default function FeedPage() {
         setSearching(false);
       }
     }, 300);
+  };
+
+  // AI Functions
+  const handleAIGenerate = async (prompt: string) => {
+    const token = getToken();
+    if (!token) return;
+
+    setShowAIPrompt(false);
+    setShowAISuggestions(true);
+    setAILoading(true);
+    setAIError('');
+    setAISuggestions([]);
+
+    try {
+      const response = await api.generateText(token, prompt, 500);
+      if (response.error) {
+        setAIError(response.error);
+      } else {
+        setAISuggestions(response.suggestions || []);
+      }
+    } catch (err) {
+      console.error('AI generation failed:', err);
+      setAIError('Failed to generate text. Please try again.');
+    } finally {
+      setAILoading(false);
+    }
+  };
+
+  const handleAIEnhance = async (tone?: 'professional' | 'casual' | 'friendly' | 'humorous') => {
+    const token = getToken();
+    if (!token) return;
+
+    const textToEnhance = isEditMode ? editPostContent : newPost;
+    if (!textToEnhance.trim()) return;
+
+    setAILoading(true);
+    try {
+      const response = await api.enhanceText(token, textToEnhance, tone, 500);
+      if (response.error) {
+        alert(response.error);
+      } else {
+        if (isEditMode) {
+          setEditPostContent(response.enhanced);
+        } else {
+          setNewPost(response.enhanced);
+        }
+      }
+    } catch (err) {
+      console.error('AI enhancement failed:', err);
+      alert('Failed to enhance text. Please try again.');
+    } finally {
+      setAILoading(false);
+    }
+  };
+
+  const handleAIShorten = async () => {
+    const token = getToken();
+    if (!token) return;
+
+    const textToShorten = isEditMode ? editPostContent : newPost;
+    if (!textToShorten.trim()) return;
+
+    setAILoading(true);
+    try {
+      const response = await api.shortenText(token, textToShorten, 500);
+      if (response.error) {
+        alert(response.error);
+      } else {
+        if (isEditMode) {
+          setEditPostContent(response.shortened);
+        } else {
+          setNewPost(response.shortened);
+        }
+      }
+    } catch (err) {
+      console.error('AI shortening failed:', err);
+      alert('Failed to shorten text. Please try again.');
+    } finally {
+      setAILoading(false);
+    }
+  };
+
+  const handleSelectAISuggestion = (text: string) => {
+    if (isEditMode) {
+      setEditPostContent(text);
+    } else {
+      setNewPost(text);
+    }
   };
 
   // Close dropdowns when clicking outside
@@ -694,14 +794,34 @@ export default function FeedPage() {
               rows={3}
               maxLength={500}
             />
+            
+            <AIToolbar
+              onGenerate={() => {
+                setIsEditMode(false);
+                setShowAIPrompt(true);
+              }}
+              onEnhance={(tone) => {
+                setIsEditMode(false);
+                handleAIEnhance(tone);
+              }}
+              onShorten={() => {
+                setIsEditMode(false);
+                handleAIShorten();
+              }}
+              disabled={aiLoading}
+              hasText={newPost.trim().length > 0}
+            />
+            
             <div className="mt-3 flex justify-between items-center">
-              <span className="text-sm text-gray-500">{newPost.length}/500</span>
+              <span className={`text-sm ${newPost.length > 450 ? 'text-orange-600 font-semibold' : 'text-gray-500'}`}>
+                {newPost.length}/500
+              </span>
               <button
                 type="submit"
-                disabled={posting || !newPost.trim()}
+                disabled={posting || !newPost.trim() || aiLoading}
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition"
               >
-                {posting ? 'Posting...' : 'Post'}
+                {posting ? 'Posting...' : aiLoading ? 'AI Processing...' : 'Post'}
               </button>
             </div>
           </form>
@@ -779,23 +899,47 @@ export default function FeedPage() {
                           rows={3}
                           maxLength={500}
                         />
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleSavePost(post.id)}
-                            disabled={!editPostContent.trim()}
-                            className="px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEditingPost(null);
-                              setEditPostContent('');
-                            }}
-                            className="px-4 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer text-sm font-medium"
-                          >
-                            Cancel
-                          </button>
+                        
+                        <AIToolbar
+                          onGenerate={() => {
+                            setIsEditMode(true);
+                            setShowAIPrompt(true);
+                          }}
+                          onEnhance={(tone) => {
+                            setIsEditMode(true);
+                            handleAIEnhance(tone);
+                          }}
+                          onShorten={() => {
+                            setIsEditMode(true);
+                            handleAIShorten();
+                          }}
+                          disabled={aiLoading}
+                          hasText={editPostContent.trim().length > 0}
+                        />
+                        
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs ${editPostContent.length > 450 ? 'text-orange-600 font-semibold' : 'text-gray-500'}`}>
+                            {editPostContent.length}/500
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleSavePost(post.id)}
+                              disabled={!editPostContent.trim() || aiLoading}
+                              className="px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                            >
+                              {aiLoading ? 'AI Processing...' : 'Save'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingPost(null);
+                                setEditPostContent('');
+                                setIsEditMode(false);
+                              }}
+                              className="px-4 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer text-sm font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1040,6 +1184,27 @@ export default function FeedPage() {
           </div>
         </div>
       )}
+
+      {/* AI Prompt Dialog */}
+      <AIPromptDialog
+        isOpen={showAIPrompt}
+        onClose={() => setShowAIPrompt(false)}
+        onGenerate={handleAIGenerate}
+      />
+
+      {/* AI Suggestions Dialog */}
+      <AIGenerateDialog
+        isOpen={showAISuggestions}
+        onClose={() => {
+          setShowAISuggestions(false);
+          setAISuggestions([]);
+          setAIError('');
+        }}
+        onSelect={handleSelectAISuggestion}
+        suggestions={aiSuggestions}
+        loading={aiLoading}
+        error={aiError}
+      />
     </div>
   );
 }
