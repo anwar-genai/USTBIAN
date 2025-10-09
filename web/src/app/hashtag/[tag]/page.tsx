@@ -31,6 +31,11 @@ export default function HashtagPage() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Record<string, any[]>>({});
+  const [newComment, setNewComment] = useState<Record<string, string>>({});
+  const [replyTo, setReplyTo] = useState<Record<string, any | null>>({});
+  const commentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
     loadData();
@@ -90,6 +95,60 @@ export default function HashtagPage() {
       });
     } catch (err) {
       console.error('Failed to setup realtime listeners', err);
+    }
+  };
+
+  const loadComments = async (postId: string) => {
+    try {
+      const data = await api.getComments(postId, 20, 0);
+      setComments((prev) => ({ ...prev, [postId]: data }));
+    } catch (e) {
+      console.error('Failed to load comments', e);
+    }
+  };
+
+  const handleToggleComments = async (postId: string) => {
+    const next = expandedPostId === postId ? null : postId;
+    setExpandedPostId(next);
+    if (next && !comments[next]) {
+      await loadComments(next);
+    }
+  };
+
+  const handleAddComment = async (postId: string) => {
+    const token = getToken();
+    if (!token) return;
+    const text = (newComment[postId] || '').trim();
+    if (!text) return;
+    try {
+      const parentId = replyTo[postId]?.id as string | undefined;
+      const created = await api.addComment(token, postId, text, parentId);
+      setComments((prev) => ({ ...prev, [postId]: [...(prev[postId] || []), created] }));
+      setNewComment((prev) => ({ ...prev, [postId]: '' }));
+      setReplyTo((prev) => ({ ...prev, [postId]: null }));
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p)));
+    } catch (e) {
+      console.error('Failed to add comment', e);
+    }
+  };
+
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      await api.deleteComment(token, postId, commentId);
+      setComments((prev) => ({ ...prev, [postId]: (prev[postId] || []).filter((c) => c.id !== commentId) }));
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, commentsCount: Math.max((p.commentsCount || 1) - 1, 0) } : p)));
+    } catch (e) {
+      console.error('Failed to delete comment', e);
+    }
+  };
+
+  const formatDate = (iso: string) => {
+    try {
+      return new Date(iso).toISOString().slice(0, 16).replace('T', ' ');
+    } catch {
+      return iso;
     }
   };
 
@@ -273,7 +332,7 @@ export default function HashtagPage() {
                           {expandedPosts.has(post.id) ? 'Show less' : 'Show more'}
                         </button>
                       )}
-                      <div className="mt-4 flex items-center gap-6">
+                      <div className="mt-4 flex items-center gap-4">
                         {/* Like Button */}
                         <button
                           onClick={() => handleLike(post.id)}
@@ -301,7 +360,7 @@ export default function HashtagPage() {
 
                         {/* Comment Button */}
                         <button
-                          onClick={() => router.push(`/post/${post.id}`)}
+                          onClick={() => handleToggleComments(post.id)}
                           className="flex items-center gap-2 px-3 py-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -314,18 +373,107 @@ export default function HashtagPage() {
                           </svg>
                           <span className="font-medium">{post.commentsCount || 0}</span>
                         </button>
-
-                        {/* View Details */}
-                        <button
-                          onClick={() => router.push(`/post/${post.id}`)}
-                          className="ml-auto flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
-                        >
-                          View details
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </button>
                       </div>
+
+                      {/* Inline Comments Section */}
+                      {expandedPostId === post.id && (
+                        <div className="mt-4 border-t border-gray-200 pt-4 space-y-3">
+                          {/* Reply indicator */}
+                          {replyTo[post.id] && (
+                            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border-l-4 border-blue-500 rounded">
+                              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                              </svg>
+                              <span className="text-xs text-gray-700">
+                                Replying to <span className="font-semibold text-blue-700">{replyTo[post.id].author?.displayName || 'User'}</span>
+                              </span>
+                              <button
+                                onClick={() => setReplyTo((prev) => ({ ...prev, [post.id]: null }))}
+                                className="ml-auto text-xs text-gray-500 hover:text-gray-700"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Comment input */}
+                          <div className="flex gap-2">
+                            <input
+                              ref={(el) => (commentInputRefs.current[post.id] = el)}
+                              type="text"
+                              value={newComment[post.id] || ''}
+                              onChange={(e) => setNewComment((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                              placeholder={replyTo[post.id] ? `Reply to ${replyTo[post.id].author?.displayName}...` : "Write a comment..."}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  if (newComment[post.id]?.trim()) {
+                                    handleAddComment(post.id);
+                                  }
+                                }
+                              }}
+                            />
+                            <button
+                              onClick={() => handleAddComment(post.id)}
+                              disabled={!newComment[post.id]?.trim()}
+                              className="p-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                              title={replyTo[post.id] ? 'Send reply' : 'Send comment'}
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                              </svg>
+                            </button>
+                          </div>
+
+                          {/* Comments list */}
+                          <div className="space-y-2">
+                            {(comments[post.id] || []).map((c) => (
+                              <div key={c.id} className={`flex items-start gap-2 ${c.parent ? 'pl-8 border-l-2 border-gray-200' : ''}`}>
+                                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-gray-700 font-semibold flex-shrink-0">
+                                  {c.author?.displayName?.[0]?.toUpperCase() || 'U'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-semibold text-gray-900">{c.author?.displayName || 'User'}</span>
+                                    <span className="text-xs text-gray-500">{formatDate(c.createdAt)}</span>
+                                  </div>
+                                  <div className="text-gray-800 text-sm mt-1 break-words">{parseMultilineText(c.content)}</div>
+                                  <div className="mt-1 flex items-center gap-3">
+                                    <button
+                                      onClick={() => {
+                                        setReplyTo((prev) => ({ ...prev, [post.id]: c }));
+                                        setTimeout(() => {
+                                          commentInputRefs.current[post.id]?.focus();
+                                        }, 0);
+                                      }}
+                                      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition"
+                                      title="Reply to this comment"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                      </svg>
+                                      Reply
+                                    </button>
+                                    {c.author?.id === currentUserId && (
+                                      <button
+                                        onClick={() => handleDeleteComment(post.id, c.id)}
+                                        className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 transition"
+                                        title="Delete this comment"
+                                      >
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                        Delete
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

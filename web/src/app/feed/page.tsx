@@ -49,6 +49,7 @@ import { AIToolbar } from '@/components/AIToolbar';
 import { AIPromptDialog } from '@/components/AIPromptDialog';
 import { AIGenerateDialog } from '@/components/AIGenerateDialog';
 import { MentionAutocomplete } from '@/components/MentionAutocomplete';
+import { AppHeader } from '@/components/AppHeader';
 import { parseMultilineText } from '@/utils/text-parser';
 import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
 
@@ -84,7 +85,6 @@ export default function FeedPage() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, any[]>>({});
   const [newComment, setNewComment] = useState<Record<string, string>>({});
@@ -96,11 +96,6 @@ export default function FeedPage() {
   const [editingPost, setEditingPost] = useState<string | null>(null);
   const [editPostContent, setEditPostContent] = useState<string>('');
   const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searching, setSearching] = useState(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // AI states
   const [showAIPrompt, setShowAIPrompt] = useState(false);
@@ -154,8 +149,6 @@ export default function FeedPage() {
     }
     return out;
   };
-  const profileMenuRef = useRef<HTMLDivElement | null>(null);
-  const profileTriggerRef = useRef<HTMLButtonElement | null>(null);
   const commentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const newPostTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const editPostTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -651,157 +644,7 @@ export default function FeedPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Ustbian</h1>
-          <div className="flex items-center gap-4">
-            {/* Search (anchored) */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setShowSearch((v) => !v);
-                  setShowNotifications(false);
-                  setShowProfileMenu(false);
-                }}
-                className="p-2 text-gray-600 hover:text-gray-900 transition focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
-                title="Search users"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
-
-              {showSearch && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-y-auto focus:outline-none">
-                  <div className="p-3 border-b border-gray-200">
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => handleSearch(e.target.value)}
-                      placeholder="Search users..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      autoFocus
-                    />
-                  </div>
-                  {searching ? (
-                    <div className="p-4 text-center text-gray-500">Searching...</div>
-                  ) : searchResults.length === 0 && searchQuery.trim() ? (
-                    <div className="p-4 text-center text-gray-500">No users found</div>
-                  ) : searchResults.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">Type to search users</div>
-                  ) : (
-                    <div className="divide-y divide-gray-100">
-                      {searchResults.map((user: any) => (
-                        <a
-                          key={user.id}
-                          href={`/user/${user.username}`}
-                          className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer transition"
-                          onClick={() => {
-                            setShowSearch(false);
-                            setSearchQuery('');
-                            setSearchResults([]);
-                          }}
-                        >
-                          {user.avatarUrl ? (
-                            <img src={user.avatarUrl} alt={user.displayName} className="w-10 h-10 rounded-full object-cover" />
-                          ) : (
-                            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-                              {user.displayName[0].toUpperCase()}
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 truncate">{user.displayName}</p>
-                            <p className="text-sm text-gray-600 truncate">@{user.username}</p>
-                          </div>
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Notifications */}
-            <NotificationBell />
-
-            {/* Profile (anchored) */}
-            <div className="relative">
-              <button
-                ref={profileTriggerRef}
-                aria-haspopup="menu"
-                aria-expanded={showProfileMenu}
-                onClick={() => {
-                  setShowProfileMenu((v) => !v);
-                }}
-                className="profile-menu-trigger focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full cursor-pointer"
-              >
-                {currentUser?.avatarUrl ? (
-                  <img
-                    src={currentUser.avatarUrl}
-                    alt={currentUser.displayName}
-                    className="w-9 h-9 rounded-full object-cover border border-gray-300 hover:border-blue-500 transition"
-                  />
-                ) : (
-                  <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold hover:bg-blue-700 transition">
-                    {currentUser?.displayName?.[0]?.toUpperCase() || 'U'}
-                  </div>
-                )}
-              </button>
-
-              {showProfileMenu && (
-                <div
-                  ref={profileMenuRef}
-                  role="menu"
-                  tabIndex={-1}
-                  className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 profile-dropdown focus:outline-none"
-                >
-                  <div className="p-3 border-b border-gray-200 flex items-center gap-3">
-                    {currentUser?.avatarUrl ? (
-                      <img src={currentUser.avatarUrl} alt="avatar" className="w-6 h-6 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-                        {currentUser?.displayName?.[0]?.toUpperCase() || 'U'}
-                      </div>
-                    )}
-                    <div>
-                      <p className="font-semibold text-gray-900 leading-4">{currentUser?.displayName}</p>
-                      <p className="text-xs text-gray-600">@{currentUser?.username}</p>
-                    </div>
-                  </div>
-                  <div className="py-1">
-                    <a
-                      href="/profile"
-                      role="menuitem"
-                      className="block px-3 py-2 text-gray-700 hover:bg-gray-50 transition"
-                    >
-                      <div className="flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        View Profile
-                      </div>
-                    </a>
-                    <button
-                      role="menuitem"
-                      onClick={handleLogout}
-                      className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 transition"
-                    >
-                      <div className="flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Logout
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      
-      </header>
+      <AppHeader />
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Create Post */}
