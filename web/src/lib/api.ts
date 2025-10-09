@@ -291,5 +291,12 @@ export const api = {
     if (!res.ok) throw new Error('Failed to check AI status');
     return res.json();
   },
+
+  // Hashtag search
+  async searchByHashtag(tag: string) {
+    const res = await fetch(`${API_URL}/posts/hashtag/${encodeURIComponent(tag)}`);
+    if (!res.ok) throw new Error('Failed to search by hashtag');
+    return res.json();
+  },
 };
 

@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CommentsService } from '../comments/comments.service';
 import { LikesService } from '../likes/likes.service';
 import { PostsService } from './posts.service';
@@ -16,6 +16,20 @@ export class PostsController {
     private readonly commentsService: CommentsService,
     private readonly likesService: LikesService,
   ) {}
+
+  @Get('hashtag/:tag')
+  @ApiOperation({ summary: 'Search posts by hashtag' })
+  async searchByHashtag(@Param('tag') tag: string) {
+    const posts = await this.postsService.searchByHashtag(tag);
+    const withCounts = await Promise.all(
+      posts.map(async (p) => ({
+        ...p,
+        commentsCount: await this.commentsService.countForPost(p.id),
+        likesCount: await this.likesService.countForPost(p.id),
+      })),
+    );
+    return withCounts as any;
+  }
 
   @Get()
   @ApiOperation({ summary: 'List recent posts (includes commentsCount)' })

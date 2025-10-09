@@ -31,14 +31,17 @@ export function parseTextWithMentionsAndHashtags(text: string): React.ReactNode[
         </Link>
       );
     } else if (hashtag) {
-      // Render #hashtag with special styling (not clickable for now, but can be made searchable later)
+      // Render #hashtag as a clickable link
+      const tagName = hashtag.slice(1); // Remove # symbol
       elements.push(
-        <span
+        <Link
           key={`hashtag-${key++}`}
-          className="font-semibold text-purple-600"
+          href={`/hashtag/${tagName.toLowerCase()}`}
+          className="font-semibold text-purple-600 hover:text-purple-700 hover:underline transition"
+          onClick={(e) => e.stopPropagation()} // Prevent parent click handlers
         >
           {hashtag}
-        </span>
+        </Link>
       );
     } else if (regularText) {
       // Regular text

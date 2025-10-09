@@ -74,6 +74,19 @@ export class PostsService {
     return await this.postsRepository.find({ order: { createdAt: 'DESC' }, take: limit });
   }
 
+  async searchByHashtag(hashtag: string, limit = 50): Promise<PostEntity[]> {
+    // Search for posts containing the hashtag (case-insensitive)
+    const searchPattern = `%#${hashtag.toLowerCase()}%`;
+    
+    return await this.postsRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .where('LOWER(post.content) LIKE :searchPattern', { searchPattern })
+      .orderBy('post.createdAt', 'DESC')
+      .take(limit)
+      .getMany();
+  }
+
   async update(authorId: string, id: string, dto: UpdatePostDto): Promise<PostEntity> {
     const post = await this.findById(id);
     if (post.author.id !== authorId) throw new UnauthorizedException('Not the author');

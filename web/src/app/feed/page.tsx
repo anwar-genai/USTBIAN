@@ -48,7 +48,9 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { AIToolbar } from '@/components/AIToolbar';
 import { AIPromptDialog } from '@/components/AIPromptDialog';
 import { AIGenerateDialog } from '@/components/AIGenerateDialog';
+import { MentionAutocomplete } from '@/components/MentionAutocomplete';
 import { parseMultilineText } from '@/utils/text-parser';
+import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
 
 interface Post {
   id: string;
@@ -155,6 +157,24 @@ export default function FeedPage() {
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const profileTriggerRef = useRef<HTMLButtonElement | null>(null);
   const commentInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const newPostTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const editPostTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  
+  // Mention autocomplete for new post
+  const {
+    mentionState: newPostMentionState,
+    handleTextChange: handleNewPostTextChange,
+    handleMentionSelect: handleNewPostMentionSelect,
+    closeMentionAutocomplete: closeNewPostMentionAutocomplete,
+  } = useMentionAutocomplete(newPostTextareaRef);
+
+  // Mention autocomplete for edit post
+  const {
+    mentionState: editPostMentionState,
+    handleTextChange: handleEditPostTextChange,
+    handleMentionSelect: handleEditPostMentionSelect,
+    closeMentionAutocomplete: closeEditPostMentionAutocomplete,
+  } = useMentionAutocomplete(editPostTextareaRef);
 
   useEffect(() => {
     const token = getToken();
@@ -785,15 +805,33 @@ export default function FeedPage() {
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Create Post */}
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <div className="bg-white rounded-lg shadow p-4 mb-6 relative">
           <form onSubmit={handleCreatePost}>
             <textarea
+              ref={newPostTextareaRef}
               value={newPost}
-              onChange={(e) => setNewPost(e.target.value)}
-              placeholder="What's on your mind?"
+              onChange={(e) => {
+                setNewPost(e.target.value);
+                handleNewPostTextChange(e.target.value, e.target.selectionStart);
+              }}
+              onKeyUp={(e) => {
+                handleNewPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+              }}
+              onClick={(e) => {
+                handleNewPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+              }}
+              placeholder="What's on your mind? Use @ to mention someone"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               rows={3}
               maxLength={500}
+            />
+            
+            <MentionAutocomplete
+              show={newPostMentionState.show}
+              query={newPostMentionState.query}
+              position={newPostMentionState.position}
+              onSelect={(username) => handleNewPostMentionSelect(username, newPost, setNewPost)}
+              onClose={closeNewPostMentionAutocomplete}
             />
             
             <AIToolbar
@@ -892,13 +930,31 @@ export default function FeedPage() {
                       )}
                     </div>
                     {editingPost === post.id ? (
-                      <div className="mt-2 space-y-2">
+                      <div className="mt-2 space-y-2 relative">
                         <textarea
+                          ref={editPostTextareaRef}
                           value={editPostContent}
-                          onChange={(e) => setEditPostContent(e.target.value)}
+                          onChange={(e) => {
+                            setEditPostContent(e.target.value);
+                            handleEditPostTextChange(e.target.value, e.target.selectionStart);
+                          }}
+                          onKeyUp={(e) => {
+                            handleEditPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+                          }}
+                          onClick={(e) => {
+                            handleEditPostTextChange(e.currentTarget.value, e.currentTarget.selectionStart);
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                           rows={3}
                           maxLength={500}
+                        />
+                        
+                        <MentionAutocomplete
+                          show={editPostMentionState.show}
+                          query={editPostMentionState.query}
+                          position={editPostMentionState.position}
+                          onSelect={(username) => handleEditPostMentionSelect(username, editPostContent, setEditPostContent)}
+                          onClose={closeEditPostMentionAutocomplete}
                         />
                         
                         <AIToolbar
