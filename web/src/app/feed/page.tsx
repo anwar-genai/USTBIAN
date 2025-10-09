@@ -50,6 +50,7 @@ import { AIPromptDialog } from '@/components/AIPromptDialog';
 import { AIGenerateDialog } from '@/components/AIGenerateDialog';
 import { MentionAutocomplete } from '@/components/MentionAutocomplete';
 import { AppHeader } from '@/components/AppHeader';
+import { Toast } from '@/components/Toast';
 import { parseMultilineText } from '@/utils/text-parser';
 import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
@@ -108,6 +109,10 @@ export default function FeedPage() {
   const [aiLoading, setAILoading] = useState(false);
   const [aiError, setAIError] = useState<string>('');
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
+  const [newPostId, setNewPostId] = useState<string | null>(null);
 
   const formatDate = (iso: string) => {
     try {
@@ -339,16 +344,56 @@ export default function FeedPage() {
     if (!token) return;
 
     setPosting(true);
+    
+    // Create optimistic post object
+    const optimisticPost: Post = {
+      id: `temp-${Date.now()}`, // Temporary ID
+      content: cleanedContent,
+      author: {
+        id: currentUserId || '',
+        username: currentUser?.username || '',
+        displayName: currentUser?.displayName || '',
+        avatarUrl: currentUser?.avatarUrl,
+      },
+      createdAt: new Date().toISOString(),
+      commentsCount: 0,
+      likesCount: 0,
+    };
+
+    // Optimistically add post to top of feed
+    setPosts((prev) => [optimisticPost, ...prev]);
+    setNewPost('');
+
     try {
-      await api.createPost(token, cleanedContent);
-      setNewPost('');
-      // Reset and reload from beginning
-      offsetRef.current = 0;
-      setHasMore(true);
-      await loadData(true);
+      // Make API call
+      const createdPost = await api.createPost(token, cleanedContent);
+      
+      // Replace optimistic post with real one from server
+      setPosts((prev) => prev.map((p) => 
+        p.id === optimisticPost.id ? { ...createdPost, commentsCount: 0, likesCount: 0 } : p
+      ));
+      
+      // Increment offset since we added a post
+      offsetRef.current = offsetRef.current + 1;
+      
+      // Show success toast
+      setToastMessage('Post created successfully!');
+      setToastType('success');
+      setShowToast(true);
+      
+      // Highlight the new post briefly
+      setNewPostId(createdPost.id);
+      setTimeout(() => setNewPostId(null), 2000);
     } catch (err) {
       console.error('Failed to create post', err);
-      alert('Failed to create post. Please try again.');
+      
+      // Remove optimistic post on error
+      setPosts((prev) => prev.filter((p) => p.id !== optimisticPost.id));
+      
+      // Show error toast
+      setToastMessage('Failed to create post. Please try again.');
+      setToastType('error');
+      setShowToast(true);
     } finally {
       setPosting(false);
     }
@@ -714,7 +759,12 @@ export default function FeedPage() {
             </div>
           ) : (
             posts.map((post) => (
-              <div key={post.id} className="bg-white rounded-lg shadow p-6">
+              <div 
+                key={post.id} 
+                className={`bg-white rounded-lg shadow p-6 transition-all ${
+                  post.id === newPostId ? 'animate-highlightPulse ring-2 ring-blue-400' : ''
+                }`}
+              >
                 <div className="flex items-start gap-3">
                   <a href={`/user/${post.author.username}`} className="flex-shrink-0 cursor-pointer">
                     {post.author.avatarUrl ? (
@@ -1125,6 +1175,15 @@ export default function FeedPage() {
         loading={aiLoading}
         error={aiError}
       />
+
+      {/* Success/Error Toast */}
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setShowToast(false)}
+        />
+      )}
     </div>
   );
 }
