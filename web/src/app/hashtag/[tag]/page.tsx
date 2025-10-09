@@ -116,16 +116,18 @@ export default function HashtagPage() {
   };
 
   const loadMore = useCallback(() => {
-    if (!loadingMore && hasMore) {
-      loadData(false);
+    // Don't load more during initial loading
+    if (loading || loadingMore || !hasMore) {
+      return;
     }
-  }, [loadingMore, hasMore]);
+    loadData(false);
+  }, [loading, loadingMore, hasMore]);
 
   // Infinite scroll hook
   useInfiniteScroll({
     onLoadMore: loadMore,
     hasMore,
-    loading: loadingMore,
+    loading: loading || loadingMore,  // Prevent trigger during initial load too
     threshold: 500,
   });
 

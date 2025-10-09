@@ -251,17 +251,20 @@ export default function FeedPage() {
   };
 
   const loadMore = useCallback(() => {
-    if (!loadingMore && hasMore) {
-      console.log('Loading more posts, current offset:', offsetRef.current);
-      loadData(false);
+    // Don't load more during initial loading
+    if (loading || loadingMore || !hasMore) {
+      console.log('Skipping loadMore:', { loading, loadingMore, hasMore, offset: offsetRef.current });
+      return;
     }
-  }, [loadingMore, hasMore]);
+    console.log('Loading more posts, current offset:', offsetRef.current);
+    loadData(false);
+  }, [loading, loadingMore, hasMore]);
 
   // Infinite scroll hook
   useInfiniteScroll({
     onLoadMore: loadMore,
     hasMore,
-    loading: loadingMore,
+    loading: loading || loadingMore,  // Prevent trigger during initial load too
     threshold: 500,
   });
 
