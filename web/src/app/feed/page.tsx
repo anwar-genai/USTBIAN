@@ -344,34 +344,14 @@ export default function FeedPage() {
     if (!token) return;
 
     setPosting(true);
-    
-    // Create optimistic post object
-    const optimisticPost: Post = {
-      id: `temp-${Date.now()}`, // Temporary ID
-      content: cleanedContent,
-      author: {
-        id: currentUserId || '',
-        username: currentUser?.username || '',
-        displayName: currentUser?.displayName || '',
-        avatarUrl: currentUser?.avatarUrl,
-      },
-      createdAt: new Date().toISOString(),
-      commentsCount: 0,
-      likesCount: 0,
-    };
-
-    // Optimistically add post to top of feed
-    setPosts((prev) => [optimisticPost, ...prev]);
     setNewPost('');
 
     try {
-      // Make API call
+      // Make API call and wait for real post
       const createdPost = await api.createPost(token, cleanedContent);
       
-      // Replace optimistic post with real one from server
-      setPosts((prev) => prev.map((p) => 
-        p.id === optimisticPost.id ? { ...createdPost, commentsCount: 0, likesCount: 0 } : p
-      ));
+      // Add real post to top of feed with smooth animation
+      setPosts((prev) => [{ ...createdPost, commentsCount: 0, likesCount: 0 }, ...prev]);
       
       // Increment offset since we added a post
       offsetRef.current = offsetRef.current + 1;
@@ -381,14 +361,14 @@ export default function FeedPage() {
       setToastType('success');
       setShowToast(true);
       
-      // Highlight the new post briefly
+      // Highlight the new post with animation
       setNewPostId(createdPost.id);
-      setTimeout(() => setNewPostId(null), 2000);
+      setTimeout(() => setNewPostId(null), 3000);
+      
+      // Smooth scroll to top to show new post
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       console.error('Failed to create post', err);
-      
-      // Remove optimistic post on error
-      setPosts((prev) => prev.filter((p) => p.id !== optimisticPost.id));
       
       // Show error toast
       setToastMessage('Failed to create post. Please try again.');
@@ -743,9 +723,12 @@ export default function FeedPage() {
               <button
                 type="submit"
                 disabled={posting || !newPost.trim() || aiLoading}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition"
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition flex items-center gap-2"
               >
-                {posting ? 'Posting...' : aiLoading ? 'AI Processing...' : 'Post'}
+                {posting && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                )}
+                {posting ? 'Creating...' : aiLoading ? 'AI Processing...' : 'Post'}
               </button>
             </div>
           </form>
@@ -761,8 +744,8 @@ export default function FeedPage() {
             posts.map((post) => (
               <div 
                 key={post.id} 
-                className={`bg-white rounded-lg shadow p-6 transition-all ${
-                  post.id === newPostId ? 'animate-highlightPulse ring-2 ring-blue-400' : ''
+                className={`bg-white rounded-lg shadow p-6 transition-all duration-300 ${
+                  post.id === newPostId ? 'animate-slideDown animate-highlightPulse ring-2 ring-blue-400 shadow-lg' : ''
                 }`}
               >
                 <div className="flex items-start gap-3">

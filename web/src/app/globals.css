@@ -56,6 +56,19 @@ body {
   }
 }
 
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 1000px;
+  }
+}
+
 @keyframes highlightPulse {
   0%, 100% {
     background-color: transparent;
@@ -79,4 +92,8 @@ body {
 
 .animate-highlightPulse {
   animation: highlightPulse 1s ease-in-out 2;
+}
+
+.animate-slideDown {
+  animation: slideDown 0.5s ease-out forwards;
 }
