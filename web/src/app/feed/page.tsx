@@ -418,40 +418,6 @@ export default function FeedPage() {
     }
   };
 
-  const handleLogout = () => {
-    clearToken();
-    router.push('/login');
-  };
-
-
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-    
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    searchTimeoutRef.current = setTimeout(async () => {
-      const token = getToken();
-      if (!token) return;
-
-      setSearching(true);
-      try {
-        const results = await api.searchUsers(token, query);
-        setSearchResults(results);
-      } catch (err) {
-        console.error('Failed to search users', err);
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
-  };
-
   // AI Functions
   const handleAIGenerate = async (prompt: string) => {
     const token = getToken();
@@ -540,38 +506,6 @@ export default function FeedPage() {
     }
   };
 
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      
-      if (showProfileMenu && !target.closest('.profile-dropdown') && !target.closest('.profile-menu-trigger')) {
-        setShowProfileMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showProfileMenu]);
-
-  // Keyboard: close on Escape and focus management
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (showProfileMenu) {
-          setShowProfileMenu(false);
-          // return focus to trigger
-          profileTriggerRef.current?.focus();
-        }
-      }
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [showProfileMenu]);
-
-  useEffect(() => {
-    if (showProfileMenu) profileMenuRef.current?.focus();
-  }, [showProfileMenu]);
   // Realtime comments listeners
   useEffect(() => {
     if (!expandedPostId) return;
