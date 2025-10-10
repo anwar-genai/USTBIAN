@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { AppHeader } from '@/components/AppHeader';
 
 type Step = 'basic' | 'education' | 'experience' | 'skills' | 'projects' | 'preview';
 
@@ -115,25 +116,28 @@ export default function NewResumePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.push('/career')}
-                className="text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                ← Back
-              </button>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Create Resume
-              </h1>
-            </div>
+      <AppHeader />
+      
+      {/* Breadcrumb Bar */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center gap-4">
             <button
-              onClick={handleAIGenerate}
-              disabled={generating}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-300 font-medium disabled:opacity-50 flex items-center gap-2"
+              onClick={() => router.push('/career')}
+              className="text-gray-600 hover:text-gray-900 transition-colors text-sm"
             >
+              ← Back to Career
+            </button>
+            <div className="h-4 w-px bg-gray-300"></div>
+            <h2 className="text-lg font-semibold text-gray-700">
+              Create Resume - Step {stepIndex + 1} of {STEPS.length}
+            </h2>
+          </div>
+          <button
+            onClick={handleAIGenerate}
+            disabled={generating}
+            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-300 font-medium disabled:opacity-50 flex items-center gap-2"
+          >
               {generating ? (
                 <>
                   <span className="animate-spin">⚡</span>
@@ -166,7 +170,7 @@ export default function NewResumePage() {
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">

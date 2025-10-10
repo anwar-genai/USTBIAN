@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { generateResumePDF, PDFTemplate } from '@/utils/pdfGenerator';
+import { AppHeader } from '@/components/AppHeader';
 
 export default function ResumeDetailPage() {
   const router = useRouter();
@@ -127,17 +128,19 @@ export default function ResumeDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
-      {/* Header - Hidden when printing */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50 print:hidden">
+      <AppHeader />
+      
+      {/* Action Bar - Hidden when printing */}
+      <div className="bg-white border-b border-gray-200 print:hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button onClick={() => router.push('/career')} className="text-gray-600 hover:text-gray-900 transition-colors">
-                ← Back
+                ← Back to Career
               </button>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <h2 className="text-xl font-semibold text-gray-700">
                 {resume.title}
-              </h1>
+              </h2>
             </div>
             <div className="flex items-center gap-3">
               {/* Template Selector */}
@@ -192,7 +195,7 @@ export default function ResumeDetailPage() {
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 print:py-0">
         {/* Resume Preview - Printable */}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { AppHeader } from '@/components/AppHeader';
 
 export default function UploadReviewPage() {
   const router = useRouter();
@@ -129,24 +130,7 @@ export default function UploadReviewPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
-      {/* Header */}
-      <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => router.push('/career')}
-              className="text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-2"
-            >
-              <span className="text-xl">←</span>
-              <span>Back</span>
-            </button>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Resume Review
-            </h1>
-            <div className="w-20"></div>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
