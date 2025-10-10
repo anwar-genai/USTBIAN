@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Career API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px 0; cursor: pointer; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Career API Test</h1>
+    
+    <div>
+        <label>Token: </label>
+        <input id="token" type="text" style="width: 500px;" placeholder="Paste your token here">
+        <button onclick="getTokenFromStorage()">Get from LocalStorage</button>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <button onclick="testCareerStats()">Test GET /career/stats</button>
+        <button onclick="testCreateResume()">Test POST /career/resumes</button>
+        <button onclick="testGetResumes()">Test GET /career/resumes</button>
+    </div>
+    
+    <div id="output"></div>
+
+    <script>
+        const API_URL = 'http://localhost:3000';
+        
+        function log(message, isError = false) {
+            const output = document.getElementById('output');
+            const div = document.createElement('div');
+            div.className = isError ? 'error' : 'success';
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            output.appendChild(div);
+        }
+
+        function getTokenFromStorage() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                document.getElementById('token').value = token;
+                log('Token retrieved from localStorage');
+            } else {
+                log('No token found in localStorage', true);
+            }
+        }
+
+        async function getToken() {
+            const token = document.getElementById('token').value;
+            if (!token) {
+                log('Please enter a token first', true);
+                return null;
+            }
+            return token;
+        }
+
+        async function testCareerStats() {
+            const token = await getToken();
+            if (!token) return;
+
+            try {
+                log('Testing GET /career/stats...');
+                const response = await fetch(`${API_URL}/career/stats`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                log(`Status: ${response.status}`);
+                const data = await response.json();
+                log(`Response: <pre>${JSON.stringify(data, null, 2)}</pre>`);
+            } catch (error) {
+                log(`Error: ${error.message}`, true);
+            }
+        }
+
+        async function testGetResumes() {
+            const token = await getToken();
+            if (!token) return;
+
+            try {
+                log('Testing GET /career/resumes...');
+                const response = await fetch(`${API_URL}/career/resumes`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                log(`Status: ${response.status}`);
+                const data = await response.json();
+                log(`Response: <pre>${JSON.stringify(data, null, 2)}</pre>`);
+            } catch (error) {
+                log(`Error: ${error.message}`, true);
+            }
+        }
+
+        async function testCreateResume() {
+            const token = await getToken();
+            if (!token) return;
+
+            const testData = {
+                title: "Test Resume - " + new Date().toLocaleTimeString(),
+                fullName: "Test User",
+                email: "test@example.com",
+                phone: "555-1234",
+                summary: "Test summary"
+            };
+
+            try {
+                log('Testing POST /career/resumes...');
+                log(`Sending data: <pre>${JSON.stringify(testData, null, 2)}</pre>`);
+                
+                const response = await fetch(`${API_URL}/career/resumes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                log(`Status: ${response.status}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ SUCCESS! Response: <pre>${JSON.stringify(data, null, 2)}</pre>`);
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ FAILED! Error: ${errorText}`, true);
+                }
+            } catch (error) {
+                log(`❌ Exception: ${error.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html>
+

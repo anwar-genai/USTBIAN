@@ -1,0 +1,7 @@
+# Add this endpoint to backend/src/career/career.controller.ts:
+
+  @Post('resumes/:id/enhance')
+  async enhanceResume(@Request() req, @Param('id') id: string) {
+    return this.careerService.enhanceResume(id, req.user.userId);
+  }
+

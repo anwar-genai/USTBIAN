@@ -304,5 +304,178 @@ export const api = {
     if (!res.ok) throw new Error('Failed to search by hashtag');
     return res.json();
   },
+
+  // ==================== CAREER TOOLS ====================
+
+  // Career Stats & Dashboard
+  async getCareerStats(token: string) {
+    const res = await fetch(`${API_URL}/career/stats`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch career stats');
+    return res.json();
+  },
+
+  // Resumes
+  async getResumes(token: string) {
+    const res = await fetch(`${API_URL}/career/resumes`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch resumes');
+    return res.json();
+  },
+
+  async getResume(token: string, id: string) {
+    const res = await fetch(`${API_URL}/career/resumes/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch resume');
+    return res.json();
+  },
+
+  async createResume(token: string, data: any) {
+    const res = await fetch(`${API_URL}/career/resumes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Resume creation failed:', res.status, errorText);
+      throw new Error(`Failed to create resume: ${res.status} - ${errorText}`);
+    }
+    return res.json();
+  },
+
+  async updateResume(token: string, id: string, data: any) {
+    const res = await fetch(`${API_URL}/career/resumes/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update resume');
+    return res.json();
+  },
+
+  async deleteResume(token: string, id: string) {
+    const res = await fetch(`${API_URL}/career/resumes/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to delete resume');
+    return res.json();
+  },
+
+  async generateResume(token: string, data: any) {
+    const res = await fetch(`${API_URL}/career/resumes/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to generate resume');
+    return res.json();
+  },
+
+  async optimizeResume(token: string, resumeId: string, targetRole?: string, jobDescription?: string) {
+    const res = await fetch(`${API_URL}/career/resumes/optimize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ resumeId, targetRole, jobDescription }),
+    });
+    if (!res.ok) throw new Error('Failed to optimize resume');
+    return res.json();
+  },
+
+  // Cover Letters
+  async getCoverLetters(token: string) {
+    const res = await fetch(`${API_URL}/career/cover-letters`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch cover letters');
+    return res.json();
+  },
+
+  async getCoverLetter(token: string, id: string) {
+    const res = await fetch(`${API_URL}/career/cover-letters/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch cover letter');
+    return res.json();
+  },
+
+  async createCoverLetter(token: string, data: any) {
+    const res = await fetch(`${API_URL}/career/cover-letters`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to create cover letter');
+    return res.json();
+  },
+
+  async updateCoverLetter(token: string, id: string, data: any) {
+    const res = await fetch(`${API_URL}/career/cover-letters/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update cover letter');
+    return res.json();
+  },
+
+  async deleteCoverLetter(token: string, id: string) {
+    const res = await fetch(`${API_URL}/career/cover-letters/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to delete cover letter');
+    return res.json();
+  },
+
+  async generateCoverLetter(token: string, data: any) {
+    const res = await fetch(`${API_URL}/career/cover-letters/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to generate cover letter');
+    return res.json();
+  },
+
+  async uploadResume(token: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${API_URL}/career/resumes/upload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    if (!res.ok) throw new Error('Failed to upload resume');
+    return res.json();
+  },
 };
 
