@@ -33,6 +33,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   emitCommentDeleted(postId: string, commentId: string) {
     this.server.emit(`comment.deleted.${postId}`, { commentId });
   }
+
+  // Post creation event for trending hashtags
+  emitPostCreated(postId: string, content: string) {
+    this.server.emit('post.created', { postId, content, timestamp: new Date() });
+  }
 }
 
 

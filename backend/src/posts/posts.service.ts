@@ -8,6 +8,7 @@ import { User } from '../users/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/notification.entity';
 import { extractMentions, getRemovedMentions, getAddedMentions } from './utils/mention-parser';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Injectable()
 export class PostsService {
@@ -18,6 +19,7 @@ export class PostsService {
     private readonly usersRepository: Repository<User>,
     @Inject(forwardRef(() => NotificationsService))
     private readonly notificationsService: NotificationsService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   async create(author: User, dto: CreatePostDto): Promise<PostEntity> {
@@ -26,6 +28,9 @@ export class PostsService {
 
     // Handle mentions
     await this.handleMentions(savedPost, author.id);
+
+    // Emit real-time event for trending hashtags
+    this.realtimeGateway.emitPostCreated(savedPost.id, savedPost.content);
 
     return savedPost;
   }

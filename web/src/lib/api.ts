@@ -304,5 +304,11 @@ export const api = {
     if (!res.ok) throw new Error('Failed to search by hashtag');
     return res.json();
   },
+
+  async getTrendingHashtags(limit: number = 10) {
+    const res = await fetch(`${API_URL}/posts/trending/hashtags?limit=${limit}`);
+    if (!res.ok) throw new Error('Failed to fetch trending hashtags');
+    return res.json();
+  },
 };
 

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 
 interface HashtagTrend {
   tag: string;
@@ -12,26 +14,48 @@ export function TrendingHashtags() {
   const router = useRouter();
   const [trends, setTrends] = useState<HashtagTrend[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     loadTrends();
     
-    // Refresh trends every 2 minutes
-    const interval = setInterval(loadTrends, 120000);
-    return () => clearInterval(interval);
+    // Set up real-time listener for new posts
+    const socket = getSocket();
+    
+    socket.on('post.created', () => {
+      console.log('New post detected, refreshing trends...');
+      refreshTrends();
+    });
+
+    // Also refresh every 30 seconds as fallback
+    const interval = setInterval(() => refreshTrends(), 30000);
+    
+    return () => {
+      socket.off('post.created');
+      clearInterval(interval);
+    };
   }, []);
 
   const loadTrends = async () => {
     try {
-      const res = await fetch('http://localhost:3000/posts/trending/hashtags?limit=8');
-      if (res.ok) {
-        const data = await res.json();
-        setTrends(data);
-      }
+      const data = await api.getTrendingHashtags(8);
+      setTrends(data);
     } catch (error) {
       console.error('Failed to load trending hashtags:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshTrends = async () => {
+    try {
+      setIsUpdating(true);
+      const data = await api.getTrendingHashtags(8);
+      setTrends(data);
+    } catch (error) {
+      console.error('Failed to refresh trending hashtags:', error);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -101,15 +125,19 @@ export function TrendingHashtags() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-purple-600 rounded-lg flex items-center justify-center animate-pulse">
-            <span className="text-white text-lg">🔥</span>
+          <div className={`w-8 h-8 bg-gradient-to-br from-pink-500 to-purple-600 rounded-lg flex items-center justify-center ${isUpdating ? 'animate-spin' : 'animate-pulse'}`}>
+            <span className="text-white text-lg">{isUpdating ? '🔄' : '🔥'}</span>
           </div>
           <h2 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
             Trending Now
           </h2>
         </div>
-        <span className="text-xs text-gray-500 bg-white/60 px-2 py-1 rounded-full border border-gray-200">
-          Live
+        <span className={`text-xs px-2 py-1 rounded-full border transition-all duration-300 ${
+          isUpdating 
+            ? 'text-blue-600 bg-blue-50 border-blue-200 animate-pulse' 
+            : 'text-green-600 bg-green-50 border-green-200'
+        }`}>
+          {isUpdating ? 'Updating...' : '● Live'}
         </span>
       </div>
 
@@ -180,7 +208,7 @@ export function TrendingHashtags() {
       {/* Footer */}
       <div className="mt-5 pt-4 border-t border-gray-200/50">
         <p className="text-xs text-center text-gray-500">
-          Updated every 2 minutes • Last 7 days
+          🔴 Real-time updates • Last 7 days
         </p>
       </div>
     </div>

@@ -7,6 +7,7 @@ import { UsersModule } from '../users/users.module';
 import { CommentsModule } from '../comments/comments.module';
 import { LikesModule } from '../likes/likes.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { RealtimeModule } from '../realtime/realtime.module';
 import { User } from '../users/user.entity';
 
 @Module({
@@ -16,6 +17,7 @@ import { User } from '../users/user.entity';
     CommentsModule,
     LikesModule,
     forwardRef(() => NotificationsModule),
+    RealtimeModule,
   ],
   providers: [PostsService],
   controllers: [PostsController],
