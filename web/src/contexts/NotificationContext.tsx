@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getSocket } from '@/lib/socket';
 import { api } from '@/lib/api';
-import { getToken } from '@/lib/auth';
+import { getToken, clearToken } from '@/lib/auth';
 
 export interface Notification {
   id: string;
@@ -53,7 +53,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const data = await api.getNotifications(token);
       setNotifications(data);
     } catch (error) {
-      console.error('Failed to fetch notifications:', error);
+      // Clear token if auth fails - likely expired
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('Failed to fetch')) {
+        clearToken();
+      }
+      // Don't log auth errors - user might not be logged in
+      if (!errorMessage.includes('Failed to fetch') && !errorMessage.includes('401')) {
+        console.error('Failed to fetch notifications:', error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -134,7 +142,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           console.log('🔌 Cleaned up global notification listeners');
         };
       } catch (error) {
-        console.error('❌ Failed to setup global notification listeners:', error);
+        // Clear token if auth fails - likely expired
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        if (errorMessage.includes('Failed to fetch')) {
+          clearToken();
+        }
+        // Don't log auth errors - user might not be logged in
+        if (!errorMessage.includes('Failed to fetch') && !errorMessage.includes('401')) {
+          console.error('❌ Failed to setup global notification listeners:', error);
+        }
       }
     };
 
