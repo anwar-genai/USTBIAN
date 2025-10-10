@@ -114,7 +114,7 @@ export default function UploadReviewSimplePage() {
         if (!updateRes.ok) console.warn('Failed to update optimization data');
       }
 
-      alert('✅ Resume saved successfully!');
+      // Redirect directly to resume detail page
       router.push(`/career/resume/${created.id}`);
     } catch (error: any) {
       console.error('Save error:', error);

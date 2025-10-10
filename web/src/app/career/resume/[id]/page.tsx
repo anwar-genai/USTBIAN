@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { generateResumePDF, PDFTemplate } from '@/utils/pdfGenerator';
 
 export default function ResumeDetailPage() {
   const router = useRouter();
@@ -11,6 +12,8 @@ export default function ResumeDetailPage() {
   const [token, setToken] = useState('');
   const [resume, setResume] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [enhancing, setEnhancing] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<PDFTemplate>('modern');
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
@@ -48,7 +51,53 @@ export default function ResumeDetailPage() {
   };
 
   const handleExport = () => {
-    // Use browser print dialog (can save as PDF)
+    if (!resume) return;
+    
+    // Generate professional PDF
+    const fileName = `${resume.fullName?.replace(/\s+/g, '_') || 'Resume'}_${selectedTemplate}.pdf`;
+    
+    generateResumePDF(
+      {
+        fullName: resume.fullName,
+        email: resume.email,
+        phone: resume.phone,
+        location: resume.location,
+        linkedin: resume.linkedin,
+        github: resume.github,
+        website: resume.website,
+        summary: resume.summary,
+        experience: resume.experience,
+        education: resume.education,
+        skills: resume.skills,
+        projects: resume.projects,
+        certifications: resume.certifications,
+      },
+      fileName,
+      selectedTemplate
+    );
+  };
+
+  const handleEnhance = async () => {
+    if (!confirm('AI will enhance your resume by:\n\n✨ Improving descriptions\n🎯 Adding achievements\n🔧 Suggesting relevant skills\n📝 Creating/improving summary\n\nContinue?')) {
+      return;
+    }
+
+    setEnhancing(true);
+    try {
+      const enhanced = await api.enhanceResume(token, id);
+      setResume(enhanced);
+      // Reload to show changes
+      await loadResume(token);
+    } catch (error) {
+      console.error('Enhancement error:', error);
+      alert('Failed to enhance resume. Please try again.');
+    } finally {
+      setEnhancing(false);
+    }
+  };
+
+  const handlePrint = () => {
+    // Use browser print dialog
     window.print();
   };
 
@@ -91,18 +140,49 @@ export default function ResumeDetailPage() {
               </h1>
             </div>
             <div className="flex items-center gap-3">
+              {/* Template Selector */}
+              <select
+                value={selectedTemplate}
+                onChange={(e) => setSelectedTemplate(e.target.value as PDFTemplate)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium bg-white hover:bg-gray-50 transition-colors"
+                title="PDF Template"
+              >
+                <option value="modern">🔵 Modern</option>
+                <option value="professional">⚫ Professional</option>
+                <option value="minimal">⚪ Minimal</option>
+                <option value="creative">🟣 Creative</option>
+              </select>
+
+              <button
+                onClick={handleEnhance}
+                disabled={enhancing}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {enhancing ? '✨ Enhancing...' : '✨ Enhance with AI'}
+              </button>
+              
               <button
                 onClick={() => router.push(`/career/resume/optimize`)}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
               >
                 🚀 Optimize
               </button>
+              
               <button
                 onClick={handleExport}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
-                📄 Export PDF
+                💾 Download PDF
               </button>
+
+              <button
+                onClick={handlePrint}
+                className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
+                title="Print"
+              >
+                🖨️
+              </button>
+              
               <button
                 onClick={handleDelete}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"

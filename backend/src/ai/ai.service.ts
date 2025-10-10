@@ -498,6 +498,104 @@ Return only the cover letter body (no date, addresses, or signature block).`;
   }
 
   /**
+   * Enhance resume by auto-filling missing/weak fields
+   */
+  async enhanceResume(resumeData: {
+    fullName?: string;
+    summary?: string;
+    experience?: any[];
+    education?: any[];
+    skills?: any[];
+    projects?: any[];
+  }): Promise<{
+    improvedSummary?: string;
+    enhancedExperience?: Array<{
+      description: string;
+      achievements: string[];
+    }>;
+    suggestedSkills?: string[];
+    enhancedProjects?: Array<{
+      description: string;
+    }>;
+  }> {
+    this.ensureOpenAI();
+
+    try {
+      this.logger.log('=== Enhancing Resume with AI ===');
+
+      const prompt = `You are a professional resume writer. Enhance this resume by improving descriptions, adding missing information, and suggesting relevant skills.
+
+Current Resume Data:
+- Name: ${resumeData.fullName || 'Not provided'}
+- Summary: ${resumeData.summary || 'Missing - please create one'}
+- Experience: ${resumeData.experience?.length || 0} entries
+- Skills: ${resumeData.skills?.map(s => s.name || s).join(', ') || 'None listed'}
+- Projects: ${resumeData.projects?.length || 0} entries
+
+Experience Details:
+${resumeData.experience?.map((exp, i) => `
+${i + 1}. ${exp.position} at ${exp.company}
+   Current Description: ${exp.description || 'None'}
+   Achievements: ${exp.achievements?.join(', ') || 'None'}
+`).join('\n') || 'No experience listed'}
+
+Projects:
+${resumeData.projects?.map((proj, i) => `
+${i + 1}. ${proj.name}
+   Description: ${proj.description || 'None'}
+`).join('\n') || 'No projects listed'}
+
+Please provide enhancements:
+1. An improved professional summary (2-3 sentences) if missing or weak
+2. Enhanced descriptions and achievements for each experience entry
+3. 5-10 relevant skills to add based on their experience
+4. Enhanced project descriptions
+
+Return as JSON:
+{
+  "improvedSummary": "Professional summary highlighting key strengths...",
+  "enhancedExperience": [
+    {
+      "description": "Improved job description with action verbs and impact...",
+      "achievements": ["Quantifiable achievement 1", "Achievement 2", "Achievement 3"]
+    }
+  ],
+  "suggestedSkills": ["Skill1", "Skill2", "Skill3", ...],
+  "enhancedProjects": [
+    {
+      "description": "Enhanced project description..."
+    }
+  ]
+}`;
+
+      const completion = await this.openai!.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert resume writer and career coach. Enhance resumes professionally with quantifiable achievements, action verbs, and industry-standard language. Focus on ATS optimization.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' },
+      });
+
+      const result = JSON.parse(completion.choices[0]?.message?.content || '{}');
+      this.logger.log('Resume enhancement complete');
+      
+      return result;
+    } catch (error) {
+      this.logger.error('Error enhancing resume:', error);
+      throw new Error('Failed to enhance resume. Please try again.');
+    }
+  }
+
+  /**
    * Parse uploaded resume text into structured data
    */
   async parseUploadedResume(resumeText: string): Promise<{
@@ -512,6 +610,7 @@ Return only the cover letter body (no date, addresses, or signature block).`;
     experience?: any[];
     education?: any[];
     skills?: string[];
+    projects?: any[];
     certifications?: string[];
   }> {
     this.ensureOpenAI();
@@ -519,7 +618,7 @@ Return only the cover letter body (no date, addresses, or signature block).`;
     try {
       this.logger.log('Parsing uploaded resume with AI...');
 
-      const prompt = `Parse the following resume text and extract structured information.
+      const prompt = `Parse the following resume text and extract ALL information including projects and skills. Be thorough!
 
 Resume Text:
 ${resumeText.substring(0, 8000)} 
@@ -555,11 +654,23 @@ Extract and return as JSON:
       "gpa": "GPA if mentioned"
     }
   ],
-  "skills": ["Skill 1", "Skill 2", ...],
+  "skills": ["Extract ALL technical and soft skills mentioned - be comprehensive!"],
+  "projects": [
+    {
+      "name": "Project name",
+      "description": "What the project does",
+      "technologies": ["Tech1", "Tech2", ...],
+      "url": "Project URL if mentioned"
+    }
+  ],
   "certifications": ["Cert 1", "Cert 2", ...]
 }
 
-Important: Return valid JSON only. If a field is not found, omit it or use empty array.`;
+IMPORTANT: 
+- Extract ALL skills mentioned anywhere in the resume (technical, soft skills, tools, languages, frameworks)
+- Extract ALL projects mentioned (personal projects, work projects, academic projects)
+- Return valid JSON only
+- If a field is not found, use empty array []`;
 
       const completion = await this.openai!.chat.completions.create({
         model: 'gpt-4o-mini',

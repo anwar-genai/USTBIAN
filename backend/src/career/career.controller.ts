@@ -90,6 +90,23 @@ export class CareerController {
     }
   }
 
+  @Post('resumes/:id/enhance')
+  async enhanceResume(@Request() req, @Param('id') id: string) {
+    console.log('=== Enhance Resume ===');
+    console.log('User ID:', req.user.userId);
+    console.log('Resume ID:', id);
+    
+    try {
+      return await this.careerService.enhanceResume(id, req.user.userId);
+    } catch (error) {
+      console.error('Enhancement error:', error);
+      throw new HttpException(
+        error.message || 'Failed to enhance resume',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
   // ==================== COVER LETTERS ====================
 
   @Post('cover-letters')

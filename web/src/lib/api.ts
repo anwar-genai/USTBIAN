@@ -398,6 +398,15 @@ export const api = {
     return res.json();
   },
 
+  async enhanceResume(token: string, id: string) {
+    const res = await fetch(`${API_URL}/career/resumes/${id}/enhance`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to enhance resume');
+    return res.json();
+  },
+
   // Cover Letters
   async getCoverLetters(token: string) {
     const res = await fetch(`${API_URL}/career/cover-letters`, {

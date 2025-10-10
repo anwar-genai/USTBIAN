@@ -176,6 +176,87 @@ export class CareerService {
     }
   }
 
+  /**
+   * Enhance resume with AI - auto-fill missing fields
+   */
+  async enhanceResume(id: string, userId: string): Promise<Resume> {
+    console.log('=== Enhance Resume ===');
+    console.log('Resume ID:', id);
+    console.log('User ID:', userId);
+
+    try {
+      const resume = await this.findOneResume(id, userId);
+      console.log('Resume found, enhancing with AI...');
+
+      // Call AI service to enhance the resume
+      const enhancements = await this.aiService.enhanceResume({
+        fullName: resume.fullName,
+        summary: resume.summary,
+        experience: resume.experience,
+        education: resume.education,
+        skills: resume.skills,
+        projects: resume.projects,
+      });
+
+      console.log('AI enhancements received');
+
+      // Update resume with enhancements
+      if (enhancements.improvedSummary && (!resume.summary || resume.summary.length < 50)) {
+        resume.summary = enhancements.improvedSummary;
+        console.log('✓ Summary enhanced');
+      }
+
+      if (enhancements.enhancedExperience && enhancements.enhancedExperience.length > 0) {
+        // Merge enhanced descriptions with existing experience
+        resume.experience = resume.experience?.map((exp, index) => {
+          const enhanced = enhancements.enhancedExperience?.[index];
+          return {
+            ...exp,
+            description: enhanced?.description || exp.description,
+            achievements: enhanced?.achievements || exp.achievements,
+          };
+        }) || [];
+        console.log('✓ Experience enhanced');
+      }
+
+      if (enhancements.suggestedSkills && enhancements.suggestedSkills.length > 0) {
+        // Add suggested skills that don't already exist
+        const existingSkillNames = resume.skills?.map(s => s.name.toLowerCase()) || [];
+        const newSkills = enhancements.suggestedSkills
+          .filter(skill => !existingSkillNames.includes(skill.toLowerCase()))
+          .map(skill => ({
+            name: skill,
+            level: 'intermediate' as const,
+            category: 'General',
+          }));
+        
+        resume.skills = [...(resume.skills || []), ...newSkills];
+        console.log(`✓ Added ${newSkills.length} new skills`);
+      }
+
+      if (enhancements.enhancedProjects && enhancements.enhancedProjects.length > 0) {
+        resume.projects = resume.projects?.map((project, index) => {
+          const enhanced = enhancements.enhancedProjects?.[index];
+          return {
+            ...project,
+            description: enhanced?.description || project.description,
+          };
+        }) || [];
+        console.log('✓ Projects enhanced');
+      }
+
+      // Save the enhanced resume
+      await this.resumeRepository.save(resume);
+      console.log('Enhanced resume saved successfully');
+
+      return resume;
+    } catch (error) {
+      console.error('=== ERROR in enhanceResume ===');
+      console.error('Error:', error.message);
+      throw error;
+    }
+  }
+
   // ==================== COVER LETTERS ====================
 
   async createCoverLetter(userId: string, dto: CreateCoverLetterDto): Promise<CoverLetter> {
