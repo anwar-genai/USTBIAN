@@ -91,6 +91,7 @@ export default function FeedPage() {
   const [hasMore, setHasMore] = useState(true);
   const offsetRef = useRef(0);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Responsive input hook
@@ -119,6 +120,8 @@ export default function FeedPage() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
   const [newPostId, setNewPostId] = useState<string | null>(null);
+  const [newPostsCount, setNewPostsCount] = useState(0);
+  const [pendingNewPosts, setPendingNewPosts] = useState<Post[]>([]);
 
   const formatDate = (iso: string) => {
     try {
@@ -226,10 +229,11 @@ export default function FeedPage() {
 
       console.log('Loading posts:', { isInitial, currentOffset, limit });
 
-      const [postsData, meData, likesData] = await Promise.all([
+      const [postsData, meData, likesData, savedData] = await Promise.all([
         api.getPosts(token, limit, currentOffset),
         isInitial ? api.getMe(token) : Promise.resolve({ userId: currentUserId }),
         isInitial ? api.getMyLikes(token).catch(() => ({ likedPostIds: [] })) : Promise.resolve({ likedPostIds: Array.from(likedPosts) }),
+        isInitial ? api.getMySavedPostIds(token).catch(() => ({ savedPostIds: [] })) : Promise.resolve({ savedPostIds: Array.from(savedPosts) }),
       ]);
 
       console.log('Received posts:', { count: postsData.length, hasMore: postsData.length >= limit });
@@ -241,6 +245,7 @@ export default function FeedPage() {
         setCurrentUserId(meData.userId);
         setCurrentUser(userData);
         setLikedPosts(new Set(likesData.likedPostIds));
+        setSavedPosts(new Set(savedData.savedPostIds));
         offsetRef.current = limit;
         // Only set hasMore to false if we got fewer posts than requested
         setHasMore(postsData.length >= limit);
@@ -293,9 +298,10 @@ export default function FeedPage() {
         const me = await api.getMe(token);
         const myUserId = me.userId as string;
 
-        // Remove existing post like listeners to prevent duplicates
+        // Remove existing listeners to prevent duplicates
         socket.off('post.like.added');
         socket.off('post.like.removed');
+        socket.off('post.created');
 
         socket.on('post.like.added', (data: { postId: string; userId: string }) => {
           if (data.userId === myUserId) return;
@@ -305,6 +311,19 @@ export default function FeedPage() {
         socket.on('post.like.removed', (data: { postId: string; userId: string }) => {
           if (data.userId === myUserId) return;
           setPosts((prev) => prev.map((p) => (p.id === data.postId ? { ...p, likesCount: Math.max((p.likesCount || 1) - 1, 0) } : p)));
+        });
+
+        // Listen for new posts from other users
+        socket.on('post.created', (newPost: Post) => {
+          // Only show indicator for posts from other users
+          if (newPost.author.id !== myUserId) {
+            setPendingNewPosts((prev) => {
+              // Avoid duplicates
+              if (prev.some((p) => p.id === newPost.id)) return prev;
+              return [newPost, ...prev];
+            });
+            setNewPostsCount((prev) => prev + 1);
+          }
         });
       } catch (err) {
         console.error('Failed to setup realtime listeners', err);
@@ -393,6 +412,23 @@ export default function FeedPage() {
     }
   };
 
+  const handleLoadNewPosts = () => {
+    if (pendingNewPosts.length === 0) return;
+    
+    // Add pending posts to the top of the feed
+    setPosts((prev) => dedupePosts(pendingNewPosts, prev));
+    
+    // Clear pending posts
+    setPendingNewPosts([]);
+    setNewPostsCount(0);
+    
+    // Smooth scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Update offset
+    offsetRef.current = offsetRef.current + pendingNewPosts.length;
+  };
+
   const handleLike = async (postId: string) => {
     const token = getToken();
     if (!token) return;
@@ -414,6 +450,38 @@ export default function FeedPage() {
       }
     } catch (err) {
       console.error('Failed to toggle like', err);
+    }
+  };
+
+  const handleSaveToggle = async (postId: string) => {
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      if (savedPosts.has(postId)) {
+        await api.unsavePost(token, postId);
+        setSavedPosts((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(postId);
+          return newSet;
+        });
+        // Show toast
+        setToastMessage('Post removed from saved');
+        setToastType('info');
+        setShowToast(true);
+      } else {
+        await api.savePost(token, postId);
+        setSavedPosts((prev) => new Set(prev).add(postId));
+        // Show toast
+        setToastMessage('Post saved successfully!');
+        setToastType('success');
+        setShowToast(true);
+      }
+    } catch (err) {
+      console.error('Failed to toggle save', err);
+      setToastMessage('Failed to save post');
+      setToastType('error');
+      setShowToast(true);
     }
   };
 
@@ -679,9 +747,49 @@ export default function FeedPage() {
       <AppHeader />
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-        {/* Two Column Layout: Feed + Sidebar */}
-        <div className="flex gap-6">
-          {/* Main Feed - Left Column */}
+        {/* Two Column Layout: Left Indicator + Feed + Sidebar */}
+        <div className="flex gap-6 relative">
+          {/* Left Side - New Posts Indicator (Fixed/Sticky) */}
+          {newPostsCount > 0 && (
+            <div className="hidden lg:block w-16 flex-shrink-0">
+              <div className="sticky top-24">
+                <button
+                  onClick={handleLoadNewPosts}
+                  className="group relative w-full flex flex-col items-center gap-2 p-3 bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 text-white rounded-2xl shadow-2xl hover:shadow-blue-500/50 hover:scale-110 transition-all duration-300 cursor-pointer animate-bounce"
+                  title={`${newPostsCount} new ${newPostsCount === 1 ? 'post' : 'posts'}`}
+                >
+                  {/* Pulse Animation Ring */}
+                  <div className="absolute inset-0 rounded-2xl bg-blue-400 animate-ping opacity-20"></div>
+                  
+                  {/* Icon */}
+                  <svg className="w-8 h-8 relative z-10 transform group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                  </svg>
+                  
+                  {/* Count Badge */}
+                  <div className="relative z-10 flex flex-col items-center">
+                    <span className="text-2xl font-black">{newPostsCount > 99 ? '99+' : newPostsCount}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider opacity-90">
+                      {newPostsCount === 1 ? 'New' : 'New'}
+                    </span>
+                  </div>
+                  
+                  {/* Sparkle Effect */}
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-300 rounded-full animate-pulse"></div>
+                  <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-pink-300 rounded-full animate-pulse delay-75"></div>
+                </button>
+                
+                {/* Label Below */}
+                <div className="mt-2 text-center">
+                  <p className="text-xs font-semibold text-gray-700 leading-tight">
+                    Click to<br/>load posts
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Main Feed - Center Column */}
           <div className="flex-1 min-w-0">
         {/* Create Post */}
         <div className="bg-gradient-to-br from-blue-50/50 via-white to-purple-50/30 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-4 sm:p-6 mb-6 relative border border-blue-100/50 backdrop-blur-sm">
@@ -1013,6 +1121,7 @@ export default function FeedPage() {
                         </svg>
                         <RollingCounter value={post.likesCount ?? 0} />
                       </button>
+                      {/* Comment Button */}
                       <button
                         aria-label={`Comments: ${post.commentsCount ?? 0}`}
                         onClick={() => handleToggleComments(post.id)}
@@ -1022,6 +1131,25 @@ export default function FeedPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8M8 14h5m5 0V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11l4-3h8a2 2 0 002-2z" />
                         </svg>
                         <RollingCounter value={post.commentsCount ?? 0} />
+                      </button>
+                      {/* Save/Bookmark Button */}
+                      <button
+                        onClick={() => handleSaveToggle(post.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full transition cursor-pointer ${
+                          savedPosts.has(post.id)
+                            ? 'bg-blue-50 text-blue-600'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                        title={savedPosts.has(post.id) ? 'Unsave post' : 'Save post'}
+                      >
+                        <svg className="w-5 h-5" fill={savedPosts.has(post.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                          />
+                        </svg>
                       </button>
                     </div>
                     {expandedPostId === post.id && (

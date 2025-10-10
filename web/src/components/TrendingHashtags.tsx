@@ -147,7 +147,7 @@ export function TrendingHashtags() {
           <button
             key={trend.tag}
             onClick={() => router.push(`/hashtag/${trend.tag}`)}
-            className="group w-full text-left p-3 rounded-xl hover:bg-white/80 transition-all duration-300 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] border border-transparent hover:border-purple-200/50"
+            className="group w-full text-left p-3 rounded-xl hover:bg-white/80 transition-all duration-300 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] border border-transparent hover:border-purple-200/50 cursor-pointer"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 flex-1 min-w-0">

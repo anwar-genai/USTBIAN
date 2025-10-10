@@ -15,6 +15,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { CommentsModule } from './comments/comments.module';
 import { AIModule } from './ai/ai.module';
+import { SavedPostsModule } from './saved-posts/saved-posts.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { AIModule } from './ai/ai.module';
     UploadsModule,
     CommentsModule,
     AIModule,
+    SavedPostsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

@@ -310,5 +310,40 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch trending hashtags');
     return res.json();
   },
+
+  // Saved Posts
+  async savePost(token: string, postId: string) {
+    const res = await fetch(`${API_URL}/posts/${postId}/saved`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to save post');
+    return res.json();
+  },
+
+  async unsavePost(token: string, postId: string) {
+    const res = await fetch(`${API_URL}/posts/${postId}/saved`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to unsave post');
+    return res.json();
+  },
+
+  async getMySavedPosts(token: string) {
+    const res = await fetch(`${API_URL}/saved-posts/my`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch saved posts');
+    return res.json();
+  },
+
+  async getMySavedPostIds(token: string) {
+    const res = await fetch(`${API_URL}/saved-posts/my/ids`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch saved post IDs');
+    return res.json();
+  },
 };
 
