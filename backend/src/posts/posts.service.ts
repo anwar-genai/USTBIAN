@@ -91,6 +91,38 @@ export class PostsService {
       .getMany();
   }
 
+  async getTrendingHashtags(limit = 10): Promise<{ tag: string; count: number }[]> {
+    // Get recent posts (last 7 days for fresher trends)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const posts = await this.postsRepository
+      .createQueryBuilder('post')
+      .where('post.createdAt >= :since', { since: sevenDaysAgo })
+      .select('post.content')
+      .getMany();
+
+    // Extract all hashtags from posts
+    const hashtagCounts = new Map<string, number>();
+    const hashtagRegex = /#(\w+)/g;
+
+    posts.forEach((post) => {
+      const matches = post.content.matchAll(hashtagRegex);
+      for (const match of matches) {
+        const tag = match[1].toLowerCase();
+        hashtagCounts.set(tag, (hashtagCounts.get(tag) || 0) + 1);
+      }
+    });
+
+    // Sort by count and return top N
+    const trending = Array.from(hashtagCounts.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
+
+    return trending;
+  }
+
   async update(authorId: string, id: string, dto: UpdatePostDto): Promise<PostEntity> {
     const post = await this.findById(id);
     if (post.author.id !== authorId) throw new UnauthorizedException('Not the author');

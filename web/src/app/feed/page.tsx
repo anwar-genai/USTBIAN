@@ -51,6 +51,7 @@ import { AIGenerateDialog } from '@/components/AIGenerateDialog';
 import { MentionAutocomplete } from '@/components/MentionAutocomplete';
 import { AppHeader } from '@/components/AppHeader';
 import { Toast } from '@/components/Toast';
+import { TrendingHashtags } from '@/components/TrendingHashtags';
 import { parseMultilineText } from '@/utils/text-parser';
 import { useMentionAutocomplete } from '@/hooks/useMentionAutocomplete';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
@@ -677,7 +678,11 @@ export default function FeedPage() {
     <div className="min-h-screen bg-gray-50">
       <AppHeader />
 
-      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        {/* Two Column Layout: Feed + Sidebar */}
+        <div className="flex gap-6">
+          {/* Main Feed - Left Column */}
+          <div className="flex-1 min-w-0">
         {/* Create Post */}
         <div className="bg-gradient-to-br from-blue-50/50 via-white to-purple-50/30 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-4 sm:p-6 mb-6 relative border border-blue-100/50 backdrop-blur-sm">
           <form onSubmit={handleCreatePost} className="space-y-3">
@@ -1154,6 +1159,13 @@ export default function FeedPage() {
               <p className="text-sm text-gray-400 mt-1">No more posts to show</p>
             </div>
           )}
+        </div>
+          </div>
+
+          {/* Trending Sidebar - Right Column (Hidden on mobile) */}
+          <div className="hidden lg:block w-80 flex-shrink-0">
+            <TrendingHashtags />
+          </div>
         </div>
       </div>
 

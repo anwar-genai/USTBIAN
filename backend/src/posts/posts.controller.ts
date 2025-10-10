@@ -31,6 +31,14 @@ export class PostsController {
     return withCounts as any;
   }
 
+  @Get('trending/hashtags')
+  @ApiOperation({ summary: 'Get trending hashtags' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of trending hashtags to return (default: 10)' })
+  async getTrendingHashtags(@Query('limit') limit?: string) {
+    const limitNum = limit ? parseInt(limit, 10) : 10;
+    return await this.postsService.getTrendingHashtags(limitNum);
+  }
+
   @Get()
   @ApiOperation({ summary: 'List recent posts (includes commentsCount)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of posts to return' })
